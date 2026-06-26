@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART-MARKET - Iniciar Sesión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen px-4">
+
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
+        <div class="text-center mb-6">
+            <div class="bg-indigo-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl mx-auto shadow-md mb-3">
+                SM
+            </div>
+            <h2 class="text-xl font-black text-slate-800 tracking-tight">SMART-MARKET</h2>
+            <p class="text-xs text-slate-400 font-medium mt-1">Ingresa tus credenciales de administrador</p>
+        </div>
+
+        <form onsubmit="manejarLogin(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Correo Electrónico</label>
+                <div class="relative">
+                    <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                    <input type="email" id="login-email" required placeholder="admin@market.com" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
+                <div class="relative">
+                    <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-100 mt-2">
+                <i data-lucide="log-in" class="w-4 h-4"></i> Acceder al Sistema
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN DE TU FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDVtKfHL77_9wzFHLBWJXW7EqAFEQgaTNM",
+            authDomain: "smart-market-c3269.firebaseapp.com",
+            projectId: "smart-market-c3269",
+            storageBucket: "smart-market-c3269.firebasestorage.app",
+            messagingSenderId: "184040984266",
+            appId: "1:184040984266:web:8418e57448b9512db62e33",
+            measurementId: "G-1S33LY5PT3"
+        };
+        
+        // Inicializar Firebase Auth
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Inicializar iconos visuales
+        try { lucide.createIcons(); } catch(e){}
+
+        // Función para procesar el inicio de sesión
+        function manejarLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById("login-email").value.trim();
+            const pass = document.getElementById("login-password").value;
+
+            Swal.fire({
+                title: 'Verificando...',
+                text: 'Por favor espere',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            auth.signInWithEmailAndPassword(email, pass)
+                .then((userCredential) => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Acceso Concedido!',
+                        text: 'Redireccionando al terminal...',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    setTimeout(() => {
+                        // Redirecciona al index o terminal principal
+                        window.location.href = "index.html"; 
+                    }, 1300);
+                })
+                .catch((error) => {
+                    console.error(error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de Autenticación',
+                        text: 'El correo o la contraseña son incorrectos.',
+                        confirmButtonColor: '#4f46e5'
+                    });
+                });
+        }
+
+        // Si el usuario ya está logueado, lo manda directo al index
+        auth.onAuthStateChanged((user) => {
+            if (user) {  window.location.href = "index.html"; }
+        });
+    </script>
+</body>
+</html>
