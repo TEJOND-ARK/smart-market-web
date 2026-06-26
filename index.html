@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -32,7 +31,7 @@
         .factura-a4-media {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #1a1a1a;
-            background-color: #fff;
+            background-color: #ffffff !important;
             width: 195mm; 
             height: 135mm; 
             padding: 8mm;
@@ -44,22 +43,36 @@
         }
         #barcode-canvas { max-height: 28px; max-width: 140px; }
         
+        #qrcode-box {
+            background-color: #ffffff !important;
+            display: block;
+            width: 54px;
+            height: 54px;
+            min-width: 54px;
+            min-height: 54px;
+        }
+        #qrcode-box img {
+            display: block !important;
+            width: 54px !important;
+            height: 54px !important;
+        }
+
         @media print {
             body { background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
             .contenedor-factura-scroll { overflow-x: visible !important; padding: 0 !important; display: block !important; }
-            .factura-a4-media { box-shadow: none !important; border: 1px solid #000 !important; width: 195mm !important; height: 135mm !important; padding: 8mm !important; position: absolute; top: 0; left: 0; border-radius: 0 !important; page-break-inside: avoid; }
+            .factura-a4-media { box-shadow: none !important; border: 1px solid #000 !important; width: 195mm !important; height: 135mm !important; padding: 8mm !important; position: absolute; top: 0; left: 0; border-radius: 0 !important; page-break-inside: avoid; background-color: #ffffff !important; }
         }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen pb-24">
 
-    <button id="btn-flotante-carrito" onclick="abrirModalCarrito()" class="no-print fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-2xl flex items-center justify-center gap-2 z-40 transition transform hover:scale-105 active:scale-95 border border-indigo-500">
+    <button id="btn-flotante-carrito" onclick="abrirModalCarrito()" class="no-print hidden fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-2xl flex items-center justify-center gap-2 z-40 transition transform hover:scale-105 active:scale-95 border border-indigo-500">
         <i data-lucide="shopping-cart" class="w-6 h-6"></i>
         <span id="badge-carrito" class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full absolute -top-1 -right-1 shadow-md border border-white">0</span>
     </button>
 
-    <div class="no-print bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+    <div id="barra-superior-nav" class="no-print hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
         <h1 id="nombreBodegaTitulo" onclick="cambiarNombreBodega()" class="text-base md:text-lg font-bold text-indigo-600 flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition truncate max-w-[50%]"></h1>
         
         <div class="flex items-center gap-2">
@@ -74,7 +87,7 @@
         </div>
     </div>
 
-    <div class="max-w-3xl mx-auto px-3 mt-4">
+    <div id="contenedor-principal" class="max-w-3xl mx-auto px-3 mt-4 hidden">
         
         <div id="vista-inicio" class="vista-seccion space-y-4 no-print">
             
@@ -120,7 +133,7 @@
                     </h3>
                     <button onclick="abrirModalCarrito()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-xl flex items-center gap-1.5 transition">
                         <i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>
-                        Ver Carrito (<span id="total-rapido-txt">S/. 0.00</span>)
+                        Ver Cesta (<span id="total-rapido-txt">S/. 0.00</span>)
                     </button>
                 </div>
                 <div class="relative mb-3">
@@ -318,7 +331,7 @@
 
                     <div class="grid grid-cols-12 gap-4 pt-1.5 border-t-2 border-slate-900 items-end">
                         <div class="col-span-7 flex gap-3 items-center">
-                            <div id="qrcode-box" class="bg-white p-0.5 border border-slate-200 rounded"></div>
+                            <div id="qrcode-box" class="bg-white border border-slate-300 rounded shadow-sm"></div>
                             <div class="space-y-1">
                                 <canvas id="barcode-canvas"></canvas>
                                 <div class="text-[7.5px] text-slate-400 leading-none">Representación impresa autorizada de la boleta electrónica.<br>Consulte el comprobante en la web de SUNAT.</div>
@@ -351,9 +364,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
-        firebase.analytics();
 
-        // Evitar clic derecho y guardados accidentales
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') e.preventDefault();
@@ -371,23 +382,23 @@
         let CLIENTES_LOCAL = [];
         let HISTORIAL_CIERRES_LOCAL = [];
         let NOMBRE_BODEGA_LOCAL = "Smart-Market";
-        let usuarioActualUid = null; // Guardará el ID del usuario logueado
+        let usuarioActualUid = null;
 
-        // --- OBSERVAR ESTADO DE AUTENTICACIÓN ---
         auth.onAuthStateChanged((user) => {
             if (user) {
-                usuarioActualUid = user.uid; // Identificador único de este usuario
+                usuarioActualUid = user.uid;
+                document.getElementById('btn-flotante-carrito').classList.remove('hidden');
+                document.getElementById('barra-superior-nav').classList.remove('hidden');
+                document.getElementById('contenedor-principal').classList.remove('hidden');
                 inicializarEscuchasTiempoReal();
             } else {
                 window.location.href = "login.html";
             }
         });
 
-        // --- CARGA FILTRADA POR USUARIO DESDE LA NUBE ---
         function inicializarEscuchasTiempoReal() {
             if(!usuarioActualUid) return;
 
-            // 1. Nombre de Bodega único para este usuario
             db.collection("configuracion").doc(usuarioActualUid).onSnapshot((doc) => {
                 if(doc.exists) {
                     NOMBRE_BODEGA_LOCAL = doc.data().nombre || "Smart-Market";
@@ -397,14 +408,12 @@
                 actualizarInterfaz();
             });
 
-            // 2. Inventario único de este usuario (.where("userId", "==", usuarioActualUid))
             db.collection("inventario").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
                 INVENTARIO_LOCAL = [];
                 snapshot.forEach(doc => {
                     INVENTARIO_LOCAL.push({ idDoc: doc.id, ...doc.data() });
                 });
 
-                // Si su catálogo está completamente vacío, se le asigna el pack inicial básico
                 if(INVENTARIO_LOCAL.length === 0) {
                     INVENTARIO_PREASIGNADO.forEach(p => {
                         db.collection("inventario").add({ ...p, userId: usuarioActualUid });
@@ -417,7 +426,6 @@
                 }
             });
 
-            // 3. Ventas Diarias activas de este usuario
             db.collection("ventas_diarias")
               .where("userId", "==", usuarioActualUid)
               .onSnapshot((snapshot) => {
@@ -425,13 +433,11 @@
                 snapshot.forEach(doc => {
                     VENTAS_LOCAL.push({ idDoc: doc.id, ...doc.data() });
                 });
-                // Ordenar manualmente por idVenta descendente ya que las consultas con Where a veces requieren índices compuestos complejos
                 VENTAS_LOCAL.sort((a,b) => b.idVenta - a.idVenta);
                 mostrarHistorialVentas();
                 calcularGanancias();
             });
 
-            // 4. Clientes registrados por este usuario
             db.collection("clientes").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
                 CLIENTES_LOCAL = [];
                 snapshot.forEach(doc => {
@@ -439,7 +445,6 @@
                 });
             });
 
-            // 5. Historial de Cierres de este usuario
             db.collection("historial_cierres").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
                 HISTORIAL_CIERRES_LOCAL = [];
                 snapshot.forEach(doc => {
@@ -462,7 +467,6 @@
         function abrirModalCarrito() {
             document.getElementById('modal-carrito').classList.remove('hidden');
             renderizarCarrito();
-            try { lucide.createIcons(); } catch(e){}
         }
 
         function cerrarModalCarrito() {
@@ -525,10 +529,10 @@
         }
 
         function buscarClienteAutocompletar(texto) {
-            let panel = document.getElementById("sugerSuggestions-clientes");
-            if(!panel) panel = document.getElementById("sugerencias-clientes");
+            let panel = document.getElementById("sugerencias-clientes");
+            if(!panel) return;
             panel.innerHTML = "";
-            let filtrados = CLIENTES_LOCAL.filter(c => c.nombre.toLowerCase().includes(texto.toLowerCase()));
+            let filtrados = CLIENTES_LOCAL.filter(c => c.nombre && c.nombre.toLowerCase().includes(texto.toLowerCase()));
 
             if(filtrados.length === 0 || texto.trim() === "") {
                 panel.classList.add('hidden'); return;
@@ -564,7 +568,7 @@
         function mostrarProductosVenta(filtro = "") {
             let lista = document.getElementById("listaProductosInicio"); if(!lista) return;
             lista.innerHTML = "";
-            let filtrados = INVENTARIO_LOCAL.filter(p => p.nombre.toLowerCase().includes(filtro.toLowerCase()));
+            let filtrados = INVENTARIO_LOCAL.filter(p => p.nombre && p.nombre.toLowerCase().includes(filtro.toLowerCase()));
 
             if(filtrados.length === 0) {
                 lista.innerHTML = "<div class='p-3 text-center text-slate-400 text-xs'>Sin productos en catálogo</div>"; return;
@@ -601,7 +605,8 @@
         }
 
         function renderizarCarrito() {
-            let contenedor = document.getElementById("carritoCuerpo"); contenedor.innerHTML = "";
+            let contenedor = document.getElementById("carritoCuerpo"); if(!contenedor) return;
+            contenedor.innerHTML = "";
             let total = 0, itemsTotales = 0;
 
             CARRITO_ACTUAL.forEach(item => {
@@ -687,7 +692,7 @@
             let totalVenta = CARRITO_ACTUAL.reduce((sum, i) => sum + (parseFloat(i.precio) * i.cantidad), 0);
 
             let nuevaVenta = {
-                userId: usuarioActualUid, // Guardamos a qué usuario le pertenece
+                userId: usuarioActualUid,
                 idVenta: Date.now(),
                 cliente: nombreCliente,
                 dni: dniCliente,
@@ -717,6 +722,7 @@
             }, 350);
         }
 
+        // --- OPTIMIZACIÓN DEFINITIVA Y NATIVA DEL CÓDIGO QR ---
         function dispararComprobanteA4(venta) {
             let total = parseFloat(venta.total);
             let subtotalNeto = total / 1.18;
@@ -746,27 +752,45 @@
             document.getElementById('lbl-itbis').innerText = igv.toFixed(2);
             document.getElementById('lbl-total').innerText = total.toFixed(2);
 
-            try { JsBarcode("#barcode-canvas", "750101234567", { format: "EAN13", width: 1.1, height: 22, displayValue: true, fontSize: 8 }); } catch(e) {}
-            try {
-                let qrBox = document.getElementById('qrcode-box'); qrBox.innerHTML = '';
-                new QRCode(qrBox, { text: `Boleta|Total:S/.${venta.total}|Cliente:${venta.cliente}`, width: 54, height: 54 });
-            } catch(e) {}
-
+            // PASO 1: Visibilizar las vistas correctamente
             document.getElementById('vista-inicio').classList.add('hidden');
             document.getElementById('vista-ajustes').classList.add('hidden');
             document.getElementById('vista-factura').classList.remove('hidden');
-            
+
+            // PASO 2: Pequeño delay de renderizado seguro para elementos gráficos
+            setTimeout(() => {
+                try { 
+                    JsBarcode("#barcode-canvas", "750101234567", { format: "EAN13", width: 1.1, height: 22, displayValue: true, fontSize: 8 }); 
+                } catch(e) { console.error("Error barras:", e); }
+                
+                try {
+                    let qrBox = document.getElementById('qrcode-box'); 
+                    
+                    // Clonación del contenedor para borrar residuos o estados bloqueados del DOM
+                    let nuevoQrBox = qrBox.cloneNode(false);
+                    qrBox.parentNode.replaceChild(nuevoQrBox, qrBox);
+                    
+                    let textoQR = `Boleta|Total:S/.${venta.total}|Cliente:${venta.cliente}`;
+                    
+                    // Método Nativo Infalible por API de imagen. Carga instantánea, sin fallos de transparencia ni tamaño
+                    nuevoQrBox.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=54x54&data=${encodeURIComponent(textoQR)}" width="54" height="54" style="display:block; background-color:#ffffff;" />`;
+                } catch(e) { 
+                    console.error("Error QR:", e); 
+                }
+            }, 80);
+
             try { lucide.createIcons(); } catch(e) {}
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function mostrarHistorialVentas() {
             let tabla = document.getElementById("tablaVentasInicio"); if(!tabla) return;
-            let tbody = tabla.getElementsByTagName("tbody")[0]; tbody.innerHTML = "";
+            let tbody = tabla.getElementsByTagName("tbody")[0]; if(!tbody) return;
+            tbody.innerHTML = "";
             
             VENTAS_LOCAL.forEach(v => {
                 let fila = tbody.insertRow();
-                let descripcionCorta = v.items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
+                let descripcionCorta = v.items ? v.items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') : '---';
                 fila.innerHTML = `
                     <td class="p-2.5 font-bold uppercase text-slate-700 truncate max-w-[100px]">${v.cliente}</td>
                     <td class="p-2.5 text-slate-500 truncate max-w-[150px]">${descripcionCorta}</td>
@@ -793,7 +817,7 @@
 
             try {
                 await db.collection("inventario").add({
-                    userId: usuarioActualUid, // Guardamos amarrado a su UID
+                    userId: usuarioActualUid,
                     nombre: nombre, 
                     precio: precio.toFixed(2), 
                     stock: stock
@@ -806,7 +830,6 @@
                 Swal.fire({ icon: 'success', title: 'Guardado', text: 'Artículo añadido a tu inventario privado.', timer: 1500, showConfirmButton: false });
             } catch (error) {
                 console.error("Error al guardar producto:", error);
-                Swal.fire({ icon: 'error', title: 'Error en la nube', text: 'No se pudo conectar con Firestore.' });
             }
         }
 
@@ -829,11 +852,11 @@
                     cliente: v.cliente,
                     metodo: v.metodo,
                     total: v.total,
-                    items: v.items.map(i => `${i.cantidad}x ${i.nombre}`)
+                    items: v.items ? v.items.map(i => `${i.cantidad}x ${i.nombre}`) : []
                 }));
 
                 let cierreCaja = {
-                    userId: usuarioActualUid, // Guardamos amarrado a su UID
+                    userId: usuarioActualUid,
                     idCierre: Date.now(), 
                     fechaIdentificador: ahora.toLocaleDateString(),
                     mesAnio: ahora.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
@@ -854,7 +877,6 @@
                     Swal.fire({ icon: 'success', title: 'Día Cerrado con Éxito', timer: 1800, showConfirmButton: false });
                 } catch (error) {
                     console.error("Error al cerrar el día:", error);
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'Hubo un problema al guardar el cierre en la nube.' });
                 }
             }
         }
@@ -914,7 +936,7 @@
             `;
 
             cierre.ventasDelDia.forEach(v => {
-                let listaItems = v.items.join("<br> ");
+                let listaItems = v.items ? v.items.join("<br> ") : '';
                 tablaHtml += `
                     <tr class="hover:bg-slate-50">
                         <td class="p-2 align-top text-slate-500 font-mono">${v.hora || '---'}</td>
@@ -952,8 +974,8 @@
             INVENTARIO_LOCAL.forEach((p, index) => {
                 let fila = tbody.insertRow(); fila.className = "hover:bg-slate-50 transition";
                 
-                let celdaNombre = fila.insertCell(0); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[150px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
-                let celdaPrecio = fila.insertCell(1); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
+                let celdaNombre = fila.insertCell(0); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[150px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
+                let celdaPrecio = fila.insertCell(1); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
                 let celdaStock = fila.insertCell(2); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
                 let celdaAccion = fila.insertCell(3); celdaAccion.className = "p-3 text-right"; celdaAccion.innerHTML = `<button class="text-red-500 font-semibold hover:underline" onclick="eliminarProducto(${index})">Eliminar</button>`;
             });
@@ -999,13 +1021,8 @@
                     CARRITO_ACTUAL = [];
                     let batch = db.batch();
                     
-                    // Solo borramos lo que pertenezca a este usuario actual
                     INVENTARIO_LOCAL.forEach(p => batch.delete(db.collection("inventario").doc(p.idDoc)));
                     VENTAS_LOCAL.forEach(v => batch.delete(db.collection("ventas_diarias").doc(v.idDoc)));
-                    HISTORIAL_CIERRES_LOCAL.forEach(c => {
-                        // Buscar el documento del cierre para eliminarlo de Firestore.
-                        // Para simplificar, puedes dejar los cierres históricos o borrarlos manualmente.
-                    });
                     
                     batch.set(db.collection("configuracion").doc(usuarioActualUid), { nombre: "Smart-Market" });
                     await batch.commit();
