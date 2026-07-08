@@ -46,7 +46,6 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN DE TU FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyDVtKfHL77_9wzFHLBWJXW7EqAFEQgaTNM",
             authDomain: "smart-market-c3269.firebaseapp.com",
@@ -57,53 +56,30 @@
             measurementId: "G-1S33LY5PT3"
         };
         
-        // Inicializar Firebase Auth
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
 
-        // Inicializar iconos visuales
         try { lucide.createIcons(); } catch(e){}
 
-        // Función para procesar el inicio de sesión
         function manejarLogin(e) {
             e.preventDefault();
-            
             const email = document.getElementById("login-email").value.trim();
             const pass = document.getElementById("login-password").value;
 
             Swal.fire({
-                title: 'Verificando...',
-                text: 'Por favor espere',
-                allowOutsideClick: false,
+                title: 'Verificando...', text: 'Por favor espere', allowOutsideClick: false,
                 didOpen: () => { Swal.showLoading(); }
             });
 
-            // OBLIGAMOS A FIREBASE A USAR PERSISTENCIA DE SESIÓN (Se borra al cerrar la pestaña)
             auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
-                .then(() => {
-                    // Una vez fijada la persistencia, procedemos con el login
-                    return auth.signInWithEmailAndPassword(email, pass);
-                })
+                .then(() => { return auth.signInWithEmailAndPassword(email, pass); })
                 .then((userCredential) => {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Acceso Concedido!',
-                        text: 'Redireccionando al terminal...',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
-                    setTimeout(() => {
-                        window.location.href = "index.html"; 
-                    }, 1300);
+                    Swal.fire({ icon: 'success', title: '¡Acceso Concedido!', text: 'Redireccionando al terminal...', timer: 1500, showConfirmButton: false });
+                    setTimeout(() => { window.location.href = "index.html"; }, 1300);
                 })
                 .catch((error) => {
                     console.error(error);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error de Autenticación',
-                        text: 'El correo o la contraseña son incorrectos.',
-                        confirmButtonColor: '#4f46e5'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Error de Autenticación', text: 'El correo o la contraseña son incorrectos.', confirmButtonColor: '#4f46e5' });
                 });
         }
     </script>
