@@ -247,7 +247,6 @@
                         </div>
                     </div>
 
-                    <!-- NUEVO: DETECTOR DE PRENDA DE VESTIR / TALLAS -->
                     <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                         <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                             <input type="checkbox" id="checkEsRopa" onchange="alternarVisibilidadTallas(this.checked)" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
@@ -290,7 +289,7 @@
                             <tr>
                                 <th class="p-3 w-12">Foto</th>
                                 <th class="p-3">Producto</th>
-                                <th class="p-3 w-16">Talla</th>
+                                <th class="p-3 w-16 text-center">Talla</th>
                                 <th class="p-3">Precio</th>
                                 <th class="p-3">Stock</th>
                                 <th class="p-3 text-right">Acción</th>
@@ -431,7 +430,6 @@
             }
         });
 
-        // HABILITA / DESHABILITA LA VISIBILIDAD DE TALLAS
         function alternarVisibilidadTallas(activado) {
             const contenedor = document.getElementById("contenedorSelectorTallas");
             if (activado) {
@@ -593,7 +591,6 @@
             actualizarInterfaz();
         }
 
-        @slot_actualizarInterfaz
         function actualizarInterfaz() {
             try {
                 document.getElementById("nombreBodegaTitulo").innerHTML = `<i data-lucide="store" class="w-4 h-4"></i> <span class="uppercase font-bold tracking-tight">${NOMBRE_BODEGA_LOCAL}</span>`;
@@ -643,7 +640,6 @@
             document.getElementById("totalGanancias").innerText = `S/. ${total.toFixed(2)}`;
         }
 
-        // MUESTRA TALLAS EN EL CATÁLOGO SI EL PRODUCTO TIENE UNA ASIGNADA
         function mostrarProductosVenta(filtro = "") {
             let lista = document.getElementById("listaProductosInicio"); if(!lista) return;
             lista.innerHTML = "";
@@ -685,7 +681,6 @@
         function agregarAlCarrito(producto) {
             let index = CARRITO_ACTUAL.findIndex(item => item.idDoc === producto.idDoc);
             
-            // Adjuntar texto de talla si aplica
             let identificadorNombre = producto.nombre;
             if(producto.talla) { identificadorNombre += ` (Talla ${producto.talla})`; }
 
@@ -900,7 +895,6 @@
             if(obj) dispararComprobanteA4(obj);
         }
 
-        // REGISTRAR PRODUCTO GUARDANDO LA TALLA SI CORRESPONDE
         async function registrarProducto() {
             if(!usuarioActualUid) return;
             let nombre = document.getElementById("regNombre").value.trim();
@@ -921,7 +915,7 @@
                     precio: precio.toFixed(2), 
                     stock: stock,
                     foto: IMAGEN_BASE64_PROCESADA,
-                    talla: talla // Guarda la propiedad en Firebase
+                    talla: talla
                 });
 
                 document.getElementById("regNombre").value = ""; 
@@ -1041,7 +1035,6 @@
             Swal.fire({ title: `Cierre: ${cierre.fechaIdentificador}`, html: tablaHtml, width: '650px', confirmButtonText: 'Entendido', confirmButtonColor: '#4f46e5' });
         }
 
-        // TABLA INVENTARIO EDITABLE: INCLUYE COLUMNA DE TALLAS QUE TAMBIÉN SE PUEDE EDITAR HACIENDO CLIC
         function mostrarInventarioAjustes() {
             let tbody = document.getElementById("tablaAjustesInventario"); if(!tbody) return;
             tbody.innerHTML = "";
@@ -1055,7 +1048,6 @@
                 
                 let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[130px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
                 
-                // CELDA DE TALLA EDITABLE DIRECTAMENTE
                 let celdaTalla = fila.insertCell(2); celdaTalla.className = "p-3 focus:bg-amber-50 rounded font-bold text-slate-600 uppercase text-center bg-slate-50/50"; celdaTalla.contentEditable = "true"; celdaTalla.innerText = p.talla || '-'; celdaTalla.onblur = function() { guardarEdicionDirecta(index, 'talla', celdaTalla.innerText); };
                 
                 let celdaPrecio = fila.insertCell(3); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
