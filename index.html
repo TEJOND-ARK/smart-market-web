@@ -138,7 +138,7 @@
                 </div>
                 <div class="relative mb-3">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-                    <input type="text" id="buscadorInicio" oninput="filtrarProductosInicio(this.value)" placeholder="Buscar abarrote por nombre..." class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="buscadorInicio" oninput="filtrarProductosInicio(this.value)" placeholder="Buscar producto por nombre o talla..." class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="lista-productos max-h-[280px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 bg-white" id="listaProductosInicio"></div>
             </div>
@@ -234,7 +234,7 @@
                 <div class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-0.5">Nombre del Producto:</label>
-                        <input type="text" id="regNombre" placeholder="Ej. Azúcar Rubia 1kg" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="regNombre" placeholder="Ej. Polo Box Algodón" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
                     
                     <div>
@@ -244,6 +244,25 @@
                             <div id="previewContenedor" class="hidden w-10 h-10 rounded-lg border overflow-hidden bg-white shrink-0 shadow-sm">
                                 <img id="imgPreview" class="w-full h-full object-cover">
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- NUEVO: DETECTOR DE PRENDA DE VESTIR / TALLAS -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="checkEsRopa" onchange="alternarVisibilidadTallas(this.checked)" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+                            <span class="text-xs font-semibold text-slate-700">¿Es ropa / prenda de vestir? (Habilitar Tallas)</span>
+                        </label>
+                        
+                        <div id="contenedorSelectorTallas" class="hidden pt-1">
+                            <label class="block text-[11px] font-bold text-indigo-600 uppercase mb-1">Seleccionar Talla de la Prenda:</label>
+                            <select id="regTalla" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                                <option value="S">Talla S</option>
+                                <option value="M" selected>Talla M</option>
+                                <option value="L">Talla L</option>
+                                <option value="XL">Talla XL</option>
+                                <option value="Estándar">Talla Única / Estándar</option>
+                            </select>
                         </div>
                     </div>
 
@@ -266,11 +285,12 @@
                     <i data-lucide="boxes" class="w-4 h-4 text-indigo-500"></i> Inventario (Editable)
                 </h2>
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
-                    <table class="w-full text-xs text-left min-w-[420px]">
+                    <table class="w-full text-xs text-left min-w-[460px]">
                         <thead class="bg-slate-50 text-slate-500 uppercase">
                             <tr>
                                 <th class="p-3 w-12">Foto</th>
                                 <th class="p-3">Producto</th>
+                                <th class="p-3 w-16">Talla</th>
                                 <th class="p-3">Precio</th>
                                 <th class="p-3">Stock</th>
                                 <th class="p-3 text-right">Acción</th>
@@ -301,7 +321,7 @@
                                 <div class="text-sm font-black text-slate-900 tracking-tight" id="factura-nombre-bodega">SMART-MARKET</div>
                                 <div class="text-[8px] text-slate-600 leading-tight">
                                     COMERCIALIZADORA GENERAL S.A.C · RUC: 20498765432<br>
-                                    Venta de Abarrotes, Bebidas y Consumo Masivo General<br>
+                                    Venta de Ropa, Calzado y Consumo General Privado<br>
                                     Dirección Comercial Principal · Punto de Venta Autorizado
                                 </div>
                             </div>
@@ -386,9 +406,8 @@
         });
 
         const INVENTARIO_PREASIGNADO = [
-            { nombre: "Arroz Costeño Extra Superior 1kg", precio: "4.80", stock: 60, foto: "" },
-            { nombre: "Leche Evaporada Gloria Azul 400g", precio: "4.20", stock: 48, foto: "" },
-            { nombre: "Aceite Vegetal Primor Premium 1L", precio: "8.50", stock: 25, foto: "" }
+            { nombre: "Polo Slim Fit Premium", precio: "45.00", stock: 20, foto: "", talla: "M" },
+            { nombre: "Casaca Cortaviento Urbana", precio: "89.90", stock: 15, foto: "", talla: "L" }
         ];
 
         let CARRITO_ACTUAL = [];
@@ -398,8 +417,6 @@
         let HISTORIAL_CIERRES_LOCAL = [];
         let NOMBRE_BODEGA_LOCAL = "Smart-Market";
         let usuarioActualUid = null;
-        
-        // NUEVA VARIABLE GLOBAL PARA GUARDAR LA FOTO EN PROCESO
         let IMAGEN_BASE64_PROCESADA = "";
 
         auth.onAuthStateChanged((user) => {
@@ -414,7 +431,16 @@
             }
         });
 
-        // NUEVA FUNCIÓN NATIVA: PROCESA, COMPRIME Y REDIMENSIONA LA IMAGEN LOCAL
+        // HABILITA / DESHABILITA LA VISIBILIDAD DE TALLAS
+        function alternarVisibilidadTallas(activado) {
+            const contenedor = document.getElementById("contenedorSelectorTallas");
+            if (activado) {
+                contenedor.classList.remove("hidden");
+            } else {
+                contenedor.classList.add("hidden");
+            }
+        }
+
         function previsualizarYConvertirImagen(input) {
             const file = input.files[0];
             if (file) {
@@ -425,7 +451,7 @@
                     img.onload = function() {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        const maxDimension = 200; // Resolución optimizada para Firestore
+                        const maxDimension = 200;
                         let width = img.width;
                         let height = img.height;
 
@@ -438,9 +464,7 @@
                         canvas.height = height;
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        // Conversión a formato compacto Base64 JPEG con calidad optimizada
                         IMAGEN_BASE64_PROCESADA = canvas.toDataURL('image/jpeg', 0.65);
-                        
                         document.getElementById("imgPreview").src = IMAGEN_BASE64_PROCESADA;
                         document.getElementById("previewContenedor").classList.remove("hidden");
                     };
@@ -529,7 +553,7 @@
         async function cambiarNombreBodega() {
             if(!usuarioActualUid) return;
             const { value: nuevo } = await Swal.fire({
-                title: 'Nombre de tu Bodega', input: 'text', inputValue: NOMBRE_BODEGA_LOCAL, showCancelButton: true, confirmButtonColor: '#4f46e5'
+                title: 'Nombre de tu Tienda', input: 'text', inputValue: NOMBRE_BODEGA_LOCAL, showCancelButton: true, confirmButtonColor: '#4f46e5'
             });
             if(nuevo && nuevo.trim() !== "") {
                 await db.collection("configuracion").doc(usuarioActualUid).set({ nombre: nuevo.trim() });
@@ -569,6 +593,7 @@
             actualizarInterfaz();
         }
 
+        @slot_actualizarInterfaz
         function actualizarInterfaz() {
             try {
                 document.getElementById("nombreBodegaTitulo").innerHTML = `<i data-lucide="store" class="w-4 h-4"></i> <span class="uppercase font-bold tracking-tight">${NOMBRE_BODEGA_LOCAL}</span>`;
@@ -618,11 +643,15 @@
             document.getElementById("totalGanancias").innerText = `S/. ${total.toFixed(2)}`;
         }
 
-        // MODIFICADO: MUESTRA LA FOTO EN EL CATÁLOGO SI EXISTE
+        // MUESTRA TALLAS EN EL CATÁLOGO SI EL PRODUCTO TIENE UNA ASIGNADA
         function mostrarProductosVenta(filtro = "") {
             let lista = document.getElementById("listaProductosInicio"); if(!lista) return;
             lista.innerHTML = "";
-            let filtrados = INVENTARIO_LOCAL.filter(p => p.nombre && p.nombre.toLowerCase().includes(filtro.toLowerCase()));
+            
+            let filtrados = INVENTARIO_LOCAL.filter(p => {
+                let buscarEn = (p.nombre || "").toLowerCase() + " " + (p.talla || "").toLowerCase();
+                return buscarEn.includes(filtro.toLowerCase());
+            });
 
             if(filtrados.length === 0) {
                 lista.innerHTML = "<div class='p-3 text-center text-slate-400 text-xs'>Sin productos en catálogo</div>"; return;
@@ -633,13 +662,15 @@
                 div.className = "flex justify-between items-center p-2.5 hover:bg-slate-50 cursor-pointer transition rounded-xl active:bg-slate-100";
                 
                 let imgHtml = p.foto ? `<img src="${p.foto}" class="w-8 h-8 rounded-lg object-cover bg-slate-100 shrink-0 shadow-sm border border-slate-100">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-100"><i data-lucide="image" class="w-3.5 h-3.5 text-slate-300"></i></div>`;
+                
+                let badgeTalla = p.talla ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1.5 uppercase">Talla ${p.talla}</span>` : "";
 
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
                         ${imgHtml}
                         <div>
-                            <p class="font-bold text-slate-800 text-xs">${p.nombre}</p>
-                            <span class="text-[10px] text-slate-400 font-semibold">Disponible: ${p.stock} un.</span>
+                            <p class="font-bold text-slate-800 text-xs inline-flex items-center">${p.nombre} ${badgeTalla}</p>
+                            <span class="text-[10px] text-slate-400 font-semibold block">Disponible: ${p.stock} un.</span>
                         </div>
                     </div>
                     <span class="text-indigo-600 font-black text-xs bg-indigo-50 px-2 py-1 rounded-lg">S/. ${p.precio}</span>`;
@@ -653,10 +684,15 @@
 
         function agregarAlCarrito(producto) {
             let index = CARRITO_ACTUAL.findIndex(item => item.idDoc === producto.idDoc);
+            
+            // Adjuntar texto de talla si aplica
+            let identificadorNombre = producto.nombre;
+            if(producto.talla) { identificadorNombre += ` (Talla ${producto.talla})`; }
+
             if (index !== -1) {
                 CARRITO_ACTUAL[index].cantidad += 1;
             } else {
-                CARRITO_ACTUAL.push({ idDoc: producto.idDoc, nombre: producto.nombre, precio: producto.precio, cantidad: 1 });
+                CARRITO_ACTUAL.push({ idDoc: producto.idDoc, nombre: identificadorNombre, precio: producto.precio, cantidad: 1 });
             }
             renderizarCarrito();
         }
@@ -864,12 +900,15 @@
             if(obj) dispararComprobanteA4(obj);
         }
 
-        // MODIFICADO: AHORA GUARDA LA FOTO LOCAL BASE64 ASOCIADA AL ARTÍCULO
+        // REGISTRAR PRODUCTO GUARDANDO LA TALLA SI CORRESPONDE
         async function registrarProducto() {
             if(!usuarioActualUid) return;
             let nombre = document.getElementById("regNombre").value.trim();
             let precio = parseFloat(document.getElementById("regPrecio").value);
             let stock = parseInt(document.getElementById("regStock").value);
+            
+            let esRopa = document.getElementById("checkEsRopa").checked;
+            let talla = esRopa ? document.getElementById("regTalla").value : "";
 
             if (!nombre || isNaN(precio) || isNaN(stock) || stock < 0) {
                 Swal.fire({ icon: 'error', title: 'Campos Inválidos', text: 'Por favor complete todos los campos con valores correctos.', confirmButtonColor: '#4f46e5' }); return;
@@ -881,15 +920,18 @@
                     nombre: nombre, 
                     precio: precio.toFixed(2), 
                     stock: stock,
-                    foto: IMAGEN_BASE64_PROCESADA // Guarda la cadena compactada
+                    foto: IMAGEN_BASE64_PROCESADA,
+                    talla: talla // Guarda la propiedad en Firebase
                 });
 
                 document.getElementById("regNombre").value = ""; 
                 document.getElementById("regPrecio").value = "";
                 document.getElementById("regStock").value = "50";
                 document.getElementById("regFotoLocal").value = "";
+                document.getElementById("checkEsRopa").checked = false;
+                document.getElementById("contenedorSelectorTallas").classList.add("hidden");
                 document.getElementById("previewContenedor").classList.add("hidden");
-                IMAGEN_BASE64_PROCESADA = ""; // Reset de la foto procesada
+                IMAGEN_BASE64_PROCESADA = "";
                 
                 Swal.fire({ icon: 'success', title: 'Guardado', text: 'Artículo añadido a tu inventario privado.', timer: 1500, showConfirmButton: false });
             } catch (error) {
@@ -904,7 +946,7 @@
             }
 
             let resultSwal = await Swal.fire({
-                title: '¿Cerrar Día Comercial?', text: "El acumulado y el desglose detallado de ventas se enviarán al historial mensual. Se limpiará el terminal.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, cerrar'
+                title: '¿Cerrar Día Comercial?', text: "El acumulado y el desglose de ventas se enviarán al historial mensual. Se limpiará el terminal.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, cerrar'
             });
 
             if(resultSwal.isConfirmed) {
@@ -922,28 +964,20 @@
                 let cierreCaja = {
                     userId: usuarioActualUid,
                     idCierre: Date.now(), 
-                    fechaIdentificador: grandmaLocaleDate(ahora),
+                    fechaIdentificador: ahora.toLocaleDateString(),
                     mesAnio: ahora.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
                     total: totalHoy.toFixed(2),
                     ventasDelDia: ventasDetalladas
                 };
 
-                function grandmaLocaleDate(d) { return d.toLocaleDateString(); }
-
                 try {
                     await db.collection("historial_cierres").add(cierreCaja);
-                    
                     let batch = db.batch();
-                    VENTAS_LOCAL.forEach(v => {
-                        let docRef = db.collection("ventas_diarias").doc(v.idDoc);
-                        batch.delete(docRef);
-                    });
+                    VENTAS_LOCAL.forEach(v => { batch.delete(db.collection("ventas_diarias").doc(v.idDoc)); });
                     await batch.commit();
                     
                     Swal.fire({ icon: 'success', title: 'Día Cerrado con Éxito', timer: 1800, showConfirmButton: false });
-                } catch (error) {
-                    console.error("Error al cerrar el día:", error);
-                }
+                } catch (error) { console.error(error); }
             }
         }
 
@@ -966,10 +1000,7 @@
                     <td class="p-3 font-medium text-slate-700">${c.fechaIdentificador}</td>
                     <td class="p-3 text-emerald-600 font-bold">S/. ${c.total}</td>
                     <td class="p-3 text-right">
-                        <button class="bg-purple-50 text-purple-600 hover:bg-purple-100 px-2.5 py-1 rounded-xl font-bold text-[10px] transition shadow-sm" 
-                                onclick="verDetalleCierre(${c.idCierre})">
-                            Ver Ventas
-                        </button>
+                        <button class="bg-purple-50 text-purple-600 hover:bg-purple-100 px-2.5 py-1 rounded-xl font-bold text-[10px] transition shadow-sm" onclick="verDetalleCierre(${c.idCierre})">Ver Ventas</button>
                     </td>
                 </tr>`;
                 tbody.innerHTML += fila;
@@ -980,26 +1011,19 @@
             let cierre = HISTORIAL_CIERRES_LOCAL.find(c => c.idCierre === idCierre);
             if (!cierre) return;
 
-            if (!cierre.ventasDelDia || cierre.ventasDelDia.length === 0) {
-                Swal.fire({ icon: 'info', title: 'Detalle no disponible', text: 'Este cierre antiguo no cuenta con el desglose de ventas guardado.' });
-                return;
-            }
-
             let tablaHtml = `
                 <div class="text-left overflow-x-auto max-h-[60vh] text-xs">
-                    <p class="mb-3 text-slate-500 font-medium">Resumen de operaciones del día <strong>${cierre.fechaIdentificador}</strong>.</p>
                     <table class="w-full border-collapse rounded-xl overflow-hidden shadow-sm text-left">
                         <thead>
                             <tr class="bg-slate-100 text-slate-600 uppercase text-[10px] font-bold">
                                 <th class="p-2 border-b">Hora</th>
                                 <th class="p-2 border-b">Cliente</th>
                                 <th class="p-2 border-b">Método</th>
-                                <th class="p-2 border-b">Artículos vendidos</th>
+                                <th class="p-2 border-b">Artículos</th>
                                 <th class="p-2 border-b text-right">Total</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-            `;
+                        <tbody class="divide-y divide-slate-100">`;
 
             cierre.ventasDelDia.forEach(v => {
                 let listaItems = v.items ? v.items.join("<br> ") : '';
@@ -1010,45 +1034,33 @@
                         <td class="p-2 align-top text-slate-600">${v.metodo || '---'}</td>
                         <td class="p-2 align-top text-slate-500 italic leading-tight">${listaItems}</td>
                         <td class="p-2 align-top text-right font-black text-slate-900">S/. ${v.total}</td>
-                    </tr>
-                `;
+                    </tr>`;
             });
 
-            tablaHtml += `
-                        </tbody>
-                    </table>
-                    <div class="mt-4 text-right text-sm">
-                        <span class="font-bold text-slate-500">Recaudación Total:</span>
-                        <span class="font-black text-emerald-600 text-lg ml-1">S/. ${cierre.total}</span>
-                    </div>
-                </div>
-            `;
-
-            Swal.fire({
-                title: `Detalle de Cierre: ${cierre.fechaIdentificador}`,
-                html: tablaHtml,
-                width: '650px',
-                confirmButtonText: 'Entendido',
-                confirmButtonColor: '#4f46e5'
-            });
+            tablaHtml += `</tbody></table></div>`;
+            Swal.fire({ title: `Cierre: ${cierre.fechaIdentificador}`, html: tablaHtml, width: '650px', confirmButtonText: 'Entendido', confirmButtonColor: '#4f46e5' });
         }
 
-        // MODIFICADO: RENDERIZA LA COLUMNA DE LA FOTO EN EL PANEL DE GESTIÓN
+        // TABLA INVENTARIO EDITABLE: INCLUYE COLUMNA DE TALLAS QUE TAMBIÉN SE PUEDE EDITAR HACIENDO CLIC
         function mostrarInventarioAjustes() {
             let tbody = document.getElementById("tablaAjustesInventario"); if(!tbody) return;
             tbody.innerHTML = "";
 
             INVENTARIO_LOCAL.forEach((p, index) => {
-                let fila = tbody.insertRow(); fila.className = "hover:bg-slate-50 transition";
+                let fila = tbody.insertRow(); fila.className = "hover:bg-slate-50 transition text-xs";
                 
                 let imgHtml = p.foto ? `<img src="${p.foto}" class="w-7 h-7 rounded object-cover bg-slate-100 border shadow-sm">` : `<div class="w-7 h-7 rounded bg-slate-100 flex items-center justify-center border text-slate-300"><i data-lucide="image" class="w-3.5 h-3.5"></i></div>`;
                 
                 fila.insertCell(0).innerHTML = `<div class="p-1">${imgHtml}</div>`;
                 
-                let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[150px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
-                let celdaPrecio = fila.insertCell(2); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
-                let celdaStock = fila.insertCell(3); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
-                let celdaAccion = fila.insertCell(4); celdaAccion.className = "p-3 text-right"; celdaAccion.innerHTML = `<button class="text-red-500 font-semibold hover:underline" onclick="eliminarProducto(${index})">Eliminar</button>`;
+                let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[130px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
+                
+                // CELDA DE TALLA EDITABLE DIRECTAMENTE
+                let celdaTalla = fila.insertCell(2); celdaTalla.className = "p-3 focus:bg-amber-50 rounded font-bold text-slate-600 uppercase text-center bg-slate-50/50"; celdaTalla.contentEditable = "true"; celdaTalla.innerText = p.talla || '-'; celdaTalla.onblur = function() { guardarEdicionDirecta(index, 'talla', celdaTalla.innerText); };
+                
+                let celdaPrecio = fila.insertCell(3); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
+                let celdaStock = fila.insertCell(4); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
+                let celdaAccion = fila.insertCell(5); celdaAccion.className = "p-3 text-right"; celdaAccion.innerHTML = `<button class="text-red-500 font-semibold hover:underline" onclick="eliminarProducto(${index})">Eliminar</button>`;
             });
             try { lucide.createIcons(); } catch(e){}
         }
@@ -1058,6 +1070,7 @@
             let datosActualizados = {};
             
             if(campo === 'nombre') datosActualizados.nombre = nuevoValor.trim();
+            if(campo === 'talla') datosActualizados.talla = (nuevoValor.trim() === '-' || nuevoValor.trim() === '') ? "" : nuevoValor.trim().toUpperCase();
             if(campo === 'precio') { let p = parseFloat(nuevoValor); datosActualizados.precio = isNaN(p) ? "0.00" : p.toFixed(2); }
             if(campo === 'stock') { let s = parseInt(nuevoValor); datosActualizados.stock = isNaN(s) || s < 0 ? 0 : s; }
             
@@ -1066,46 +1079,31 @@
 
         async function eliminarProducto(index) {
             let prod = INVENTARIO_LOCAL[index];
-            let resultSwal = await Swal.fire({ title: '¿Eliminar artículo?', text: `Se quitará permanentemente de tu inventario.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Eliminar' });
-            if(resultSwal.isConfirmed) {
-                await db.collection("inventario").doc(prod.idDoc).delete();
-            }
+            let resultSwal = await Swal.fire({ title: '¿Eliminar artículo?', text: `Se quitará permanentemente.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Eliminar' });
+            if(resultSwal.isConfirmed) { await db.collection("inventario").doc(prod.idDoc).delete(); }
         }
 
-        // OPTIMIZADO: FORMATEA EL SISTEMA BORRANDO TAMBIÉN TODO EL HISTORIAL DE CIERRES ANTERIORES
         async function formatearTodoElSistema() {
             if(!usuarioActualUid) return;
             let primerConfirmacion = await Swal.fire({
-                title: '¿Estás completamente seguro?',
-                text: "Esta acción borrará TODO tu inventario (incluyendo fotos subidas), ventas acumuladas e historiales de cierres mensuales de forma irreversible.",
-                icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, borrar mi tienda'
+                title: '¿Estás completamente seguro?', text: "Esta acción borrará TODO tu inventario (con tallas y fotos locales), ventas e historiales irreversibles.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, borrar mi tienda'
             });
 
             if(primerConfirmacion.isConfirmed) {
                 let segundaConfirmacion = await Swal.fire({
-                    title: 'Verificación Final de Seguridad', text: 'Escribe "BORRAR TODO" en mayúsculas para proceder con el formateo completo de la nube:',
-                    input: 'text', inputPlaceholder: 'BORRAR TODO', icon: 'error', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280',
-                    preConfirm: (valor) => {
-                        if (valor !== 'BORRAR TODO') { Swal.showValidationMessage('El texto de seguridad no coincide.'); }
-                    }
+                    title: 'Verificación Final de Seguridad', text: 'Escribe "BORRAR TODO" en mayúsculas para proceder:',
+                    input: 'text', inputPlaceholder: 'BORRAR_TODO', icon: 'error', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280',
+                    preConfirm: (valor) => { if (valor !== 'BORRAR TODO') { Swal.showValidationMessage('El texto no coincide.'); } }
                 });
 
                 if(segundaConfirmacion.isConfirmed) {
-                    Swal.fire({ title: 'Restableciendo base de datos...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-                    
+                    Swal.fire({ title: 'Restableciendo nube...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
                     CARRITO_ACTUAL = [];
                     let batch = db.batch();
-                    
-                    // 1. Limpieza de Inventario (Con fotos locales)
                     INVENTARIO_LOCAL.forEach(p => batch.delete(db.collection("inventario").doc(p.idDoc)));
-                    
-                    // 2. Limpieza de Ventas Diarias
                     VENTAS_LOCAL.forEach(v => batch.delete(db.collection("ventas_diarias").doc(v.idDoc)));
-                    
-                    // 3. Limpieza Completa de Cierres Históricos en la nube
                     let snapCierres = await db.collection("historial_cierres").where("userId", "==", usuarioActualUid).get();
                     snapCierres.forEach(doc => batch.delete(db.collection("historial_cierres").doc(doc.id)));
-                    
                     batch.set(db.collection("configuracion").doc(usuarioActualUid), { nombre: "Smart-Market" });
                     await batch.commit();
 
@@ -1113,7 +1111,7 @@
                     document.getElementById('vista-factura').classList.add('hidden');
                     document.getElementById('vista-inicio').classList.remove('hidden');
 
-                    await Swal.fire({ icon: 'success', title: 'Tu Tienda ha sido Restablecida por Completo', text: 'Todos los registros históricos se han limpiado.', confirmButtonColor: '#4f46e5' });
+                    await Swal.fire({ icon: 'success', title: 'Tienda Restablecida', text: 'Todos los registros históricos se han limpiado.', confirmButtonColor: '#4f46e5' });
                     actualizarInterfaz();
                 }
             }
@@ -1123,11 +1121,7 @@
             Swal.fire({
                 title: '¿Cerrar sesión?', text: "Saldrás de tu cuenta comercial.", icon: 'warning',
                 showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#64748b', confirmButtonText: 'Sí, salir'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    auth.signOut().then(() => { window.location.href = "login.html"; });
-                }
-            });
+            }).then((result) => { if (result.isConfirmed) { auth.signOut().then(() => { window.location.href = "login.html"; }); } });
         }
     </script>
 </body>
