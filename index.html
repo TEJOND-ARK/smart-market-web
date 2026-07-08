@@ -659,7 +659,8 @@
                 
                 let imgHtml = p.foto ? `<img src="${p.foto}" class="w-8 h-8 rounded-lg object-cover bg-slate-100 shrink-0 shadow-sm border border-slate-100">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-100"><i data-lucide="image" class="w-3.5 h-3.5 text-slate-300"></i></div>`;
                 
-                let badgeTalla = p.talla ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1.5 uppercase">Talla ${p.talla}</span>` : "";
+                // MEJORA: Solo muestra la insignia si tiene talla asignada y es diferente a "N/A"
+                let badgeTalla = (p.talla && p.talla !== "N/A") ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1.5 uppercase">Talla ${p.talla}</span>` : "";
 
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
@@ -682,7 +683,7 @@
             let index = CARRITO_ACTUAL.findIndex(item => item.idDoc === producto.idDoc);
             
             let identificadorNombre = producto.nombre;
-            if(producto.talla) { identificadorNombre += ` (Talla ${producto.talla})`; }
+            if(producto.talla && producto.talla !== "N/A") { identificadorNombre += ` (Talla ${producto.talla})`; }
 
             if (index !== -1) {
                 CARRITO_ACTUAL[index].cantidad += 1;
@@ -895,6 +896,7 @@
             if(obj) dispararComprobanteA4(obj);
         }
 
+        // MEJORA: Lógica de guardado que asume "N/A" si no se activa la casilla de verificación de ropa.
         async function registrarProducto() {
             if(!usuarioActualUid) return;
             let nombre = document.getElementById("regNombre").value.trim();
@@ -902,7 +904,7 @@
             let stock = parseInt(document.getElementById("regStock").value);
             
             let esRopa = document.getElementById("checkEsRopa").checked;
-            let talla = esRopa ? document.getElementById("regTalla").value : "";
+            let talla = esRopa ? document.getElementById("regTalla").value : "N/A";
 
             if (!nombre || isNaN(precio) || isNaN(stock) || stock < 0) {
                 Swal.fire({ icon: 'error', title: 'Campos Inválidos', text: 'Por favor complete todos los campos con valores correctos.', confirmButtonColor: '#4f46e5' }); return;
@@ -1048,7 +1050,8 @@
                 
                 let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[130px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
                 
-                let celdaTalla = fila.insertCell(2); celdaTalla.className = "p-3 focus:bg-amber-50 rounded font-bold text-slate-600 uppercase text-center bg-slate-50/50"; celdaTalla.contentEditable = "true"; celdaTalla.innerText = p.talla || '-'; celdaTalla.onblur = function() { guardarEdicionDirecta(index, 'talla', celdaTalla.innerText); };
+                // MEJORA: Renderiza la talla actual y si es "N/A" lo muestra limpio
+                let celdaTalla = fila.insertCell(2); celdaTalla.className = "p-3 focus:bg-amber-50 rounded font-bold text-slate-600 uppercase text-center bg-slate-50/50"; celdaTalla.contentEditable = "true"; celdaTalla.innerText = (p.talla && p.talla !== "N/A") ? p.talla : '-'; celdaTalla.onblur = function() { guardarEdicionDirecta(index, 'talla', celdaTalla.innerText); };
                 
                 let celdaPrecio = fila.insertCell(3); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
                 let celdaStock = fila.insertCell(4); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
@@ -1057,12 +1060,16 @@
             try { lucide.createIcons(); } catch(e){}
         }
 
+        // MEJORA: Controla que al editar directamente en la celda se asigne "N/A" si escriben '-' o borran el contenido
         async function guardarEdicionDirecta(index, campo, nuevoValor) {
             let prod = INVENTARIO_LOCAL[index];
             let datosActualizados = {};
             
             if(campo === 'nombre') datosActualizados.nombre = nuevoValor.trim();
-            if(campo === 'talla') datosActualizados.talla = (nuevoValor.trim() === '-' || nuevoValor.trim() === '') ? "" : nuevoValor.trim().toUpperCase();
+            if(campo === 'talla') {
+                let t = nuevoValor.trim().toUpperCase();
+                datosActualizados.talla = (t === '-' || t === '' || t === 'N/A') ? "N/A" : t;
+            }
             if(campo === 'precio') { let p = parseFloat(nuevoValor); datosActualizados.precio = isNaN(p) ? "0.00" : p.toFixed(2); }
             if(campo === 'stock') { let s = parseInt(nuevoValor); datosActualizados.stock = isNaN(s) || s < 0 ? 0 : s; }
             
