@@ -3,23 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMART-MARKET - Control de Inventario Privado</title>
+    <title>SMART-MARKET - Sistema Comercial y Facturación Completa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+
+    <style>
+        .contenedor-factura-scroll {
+            width: 100%;
+            overflow-x: auto;
+            padding: 8px 4px;
+            display: flex;
+            justify-content: flex-start;
+        }
+        @media (min-width: 1024px) {
+            .contenedor-factura-scroll {
+                justify-content: center;
+                overflow-x: visible;
+            }
+        }
+        .factura-a4-media {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #1a1a1a;
+            background-color: #ffffff !important;
+            width: 195mm; 
+            height: 135mm; 
+            padding: 8mm;
+            box-sizing: border-box;
+            position: relative;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        #barcode-canvas { max-height: 28px; max-width: 140px; }
+        
+        #qrcode-box {
+            background-color: #ffffff !important;
+            display: block;
+            width: 54px;
+            height: 54px;
+            min-width: 54px;
+            min-height: 54px;
+        }
+        #qrcode-box img {
+            display: block !important;
+            width: 54px !important;
+            height: 54px !important;
+        }
+
+        @media print {
+            body { background: white !important; margin: 0 !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .contenedor-factura-scroll { overflow-x: visible !important; padding: 0 !important; display: block !important; }
+            .factura-a4-media { box-shadow: none !important; border: 1px solid #000 !important; width: 195mm !important; height: 135mm !important; padding: 8mm !important; position: absolute; top: 0; left: 0; border-radius: 0 !important; page-break-inside: avoid; background-color: #ffffff !important; }
+        }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen pb-24">
 
-    <button id="btn-flotante-carrito" onclick="abrirModalCarrito()" class="hidden fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-2xl flex items-center justify-center gap-2 z-40 transition transform hover:scale-105 border border-indigo-500">
+    <button id="btn-flotante-carrito" onclick="abrirModalCarrito()" class="no-print hidden fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-2xl flex items-center justify-center gap-2 z-40 transition transform hover:scale-105 active:scale-95 border border-indigo-500">
         <i data-lucide="shopping-cart" class="w-6 h-6"></i>
         <span id="badge-carrito" class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full absolute -top-1 -right-1 shadow-md border border-white">0</span>
     </button>
 
-    <div id="barra-superior-nav" class="hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+    <div id="barra-superior-nav" class="no-print hidden bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-30 shadow-sm">
         <h1 id="nombreBodegaTitulo" onclick="cambiarNombreBodega()" class="text-base md:text-lg font-bold text-indigo-600 flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition truncate max-w-[50%]"></h1>
         
         <div class="flex items-center gap-2">
@@ -36,14 +89,41 @@
 
     <div id="contenedor-principal" class="max-w-3xl mx-auto px-3 mt-4 hidden">
         
-        <div id="vista-inicio" class="vista-seccion space-y-4">
+        <div id="vista-inicio" class="vista-seccion space-y-4 no-print">
             
             <div class="bg-gradient-to-br from-indigo-600 to-violet-700 text-white rounded-2xl p-4 text-center shadow-md relative overflow-hidden">
-                <span class="text-indigo-100 text-xs font-semibold tracking-wider uppercase block">Caja Acumulada de Hoy</span>
+                <span class="text-indigo-100 text-xs font-semibold tracking-wider uppercase block">Ganancias de Hoy</span>
                 <p class="text-3xl font-black my-1.5 tracking-tight" id="totalGanancias">S/. 0.00</p>
                 <button class="mt-1 bg-white/20 hover:bg-white text-white hover:text-indigo-700 border border-white/30 py-1.5 px-4 rounded-xl font-bold text-xs transition inline-flex items-center gap-1.5" onclick="cerrarDiaDeVentas()">
-                    <i data-lucide="sun" class="w-3.5 h-3.5"></i> Guardar y Cerrar Día
+                    <i data-lucide="sun" class="w-3.5 h-3.5"></i> Cerrar Día de Ventas
                 </button>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="user" class="w-4 h-4 text-indigo-500"></i> Datos del Cliente
+                    </h3>
+                    <button onclick="limpiarCamposCliente()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1 px-2.5 rounded-xl flex items-center gap-1 transition shadow-sm" title="Nuevo Cliente">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Nuevo Cliente
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="relative">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nombre Completo</label>
+                        <input type="text" id="input-cliente-inicio" value="PÚBLICO GENERAL" autocomplete="off" oninput="buscarClienteAutocompletar(this.value)" onfocus="buscarClienteAutocompletar(this.value)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium uppercase">
+                        <div id="sugerencias-clientes" class="absolute left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl mt-1 hidden max-h-48 overflow-y-auto z-50 divide-y divide-slate-100 text-xs"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">DNI / RUC</label>
+                        <input type="text" id="input-dni-cliente" placeholder="- En Blanco -" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Dirección de Vivienda</label>
+                        <input type="text" id="input-dir-cliente" placeholder="- En Blanco -" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium uppercase">
+                    </div>
+                </div>
             </div>
 
             <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col w-full">
@@ -58,22 +138,23 @@
                 </div>
                 <div class="relative mb-3">
                     <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-                    <input type="text" id="buscadorInicio" oninput="filtrarProductosInicio(this.value)" placeholder="Buscar por nombre o talla..." class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="buscadorInicio" oninput="filtrarProductosInicio(this.value)" placeholder="Buscar abarrote por nombre..." class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="lista-productos max-h-[350px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 bg-white" id="listaProductosInicio"></div>
+                <div class="lista-productos max-h-[280px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 bg-white" id="listaProductosInicio"></div>
             </div>
 
             <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
                 <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    <i data-lucide="clipboard-list" class="w-4 h-4 text-indigo-500"></i> Últimas Ventas del Día
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-indigo-500"></i> Últimas Ventas Realizadas
                 </h3>
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
                     <table id="tablaVentasInicio" class="w-full text-xs text-left min-w-[320px]">
                         <thead class="bg-slate-50 text-slate-500 uppercase font-semibold">
                             <tr>
-                                <th class="p-2.5">Detalle Productos</th>
-                                <th class="p-2.5">Método de Pago</th>
-                                <th class="p-2.5 text-right">Total Cobrado</th>
+                                <th class="p-2.5">Comprador</th>
+                                <th class="p-2.5">Detalle</th>
+                                <th class="p-2.5">Total</th>
+                                <th class="p-2.5 text-right">Acción</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100"></tbody>
@@ -82,11 +163,11 @@
             </div>
         </div>
 
-        <div id="modal-carrito" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div id="modal-carrito" class="no-print fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl w-full max-w-md p-4 shadow-2xl flex flex-col max-h-[85vh] border border-slate-100">
                 <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-3">
                     <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                        <i data-lucide="shopping-cart" class="text-indigo-600 w-5 h-5"></i> Salida de Inventario Actual
+                        <i data-lucide="shopping-cart" class="text-indigo-600 w-5 h-5"></i> Cesta Actual de Compra
                     </h3>
                     <button onclick="cerrarModalCarrito()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition">
                         <i data-lucide="x" class="w-5 h-5"></i>
@@ -97,35 +178,53 @@
                 
                 <div class="border-t border-slate-100 pt-3 mt-3 space-y-3">
                     <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-slate-500 uppercase">Monto Total:</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase">Total a Pagar:</span>
                         <span class="text-2xl font-black text-slate-900" id="carritoTotalLabel">S/. 0.00</span>
                     </div>
-                    <button onclick="preguntarMetodoPago()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow">
-                        <i data-lucide="check-circle" class="w-4 h-4"></i> Procesar y Descontar Stock
+                    <button onclick="preguntarMetodoPagoYBoleta()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow shadow-indigo-100">
+                        <i data-lucide="receipt" class="w-4 h-4"></i> Emitir Comprobante
                     </button>
                 </div>
             </div>
         </div>
 
-        <div id="vista-ajustes" class="vista-seccion hidden space-y-4">
+        <div id="vista-ajustes" class="vista-seccion hidden space-y-4 no-print">
             
-            <div class="bg-red-50 p-4 rounded-2xl border border-red-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="bg-red-50 rounded-2xl p-4 border border-red-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div class="text-center sm:text-left">
-                    <h3 class="text-sm font-bold text-red-900 flex items-center justify-center sm:justify-start gap-1.5">
-                        <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i> Zona de Peligro Administrativa
-                    </h3>
-                    <p class="text-[11px] text-red-700 mt-0.5">Esto borrará permanentemente todo tu inventario, ventas del día e historiales.</p>
+                    <h2 class="text-sm font-bold text-red-900 flex items-center justify-center sm:justify-start gap-1.5">
+                        <i data-lucide="octagon-alert" class="w-4 h-4 text-red-600"></i> Zona de Peligro Administrativa
+                    </h2>
+                    <p class="text-[11px] text-red-700 font-medium">Esta acción restablecerá tu tienda por completo en la nube. Borrará todo el inventario, ventas e historiales diarios/mensuales.</p>
                 </div>
-                <button onclick="formatearSistemaPorCompleto()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition shadow-md w-full sm:w-auto">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> Formatear y Vaciar Todo
+                <button class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow w-full sm:w-auto shrink-0" onclick="formatearTodoElSistema()">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Formatear Mi Tienda
                 </button>
             </div>
 
             <div class="bg-gradient-to-b from-purple-50 to-white rounded-2xl p-4 border border-purple-200 shadow-sm">
                 <h2 class="text-sm font-bold text-purple-900 flex items-center gap-1.5 mb-2">
-                    <i data-lucide="trending-up" class="w-4 h-4 text-purple-600"></i> Historial Acumulado por Meses
+                    <i data-lucide="trending-up" class="w-4 h-4 text-purple-600"></i> Resumen Mensual
                 </h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="reporteMesesCuerpo"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                    <i data-lucide="archive" class="w-4 h-4 text-slate-500"></i> Historial de Cierres
+                </h2>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-500 uppercase">
+                            <tr>
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Recaudación</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaHistorialCierres" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
@@ -135,54 +234,43 @@
                 <div class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-0.5">Nombre del Producto:</label>
-                        <input type="text" id="regNombre" placeholder="Ej. Polo Over-Sized Algodón" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="regNombre" placeholder="Ej. Azúcar Rubia 1kg" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
                     
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-0.5">Subir Foto del Producto (Desde tu Celular o PC):</label>
-                        <div class="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-semibold text-slate-600 mb-0.5">Subir Imagen del Producto (Desde Almacenamiento Local):</label>
+                        <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
                             <input type="file" id="regFotoLocal" accept="image/*" onchange="previsualizarYConvertirImagen(this)" class="block w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
-                            <div id="previewContenedor" class="hidden w-10 h-10 rounded-lg border overflow-hidden bg-white shrink-0">
+                            <div id="previewContenedor" class="hidden w-10 h-10 rounded-lg border overflow-hidden bg-white shrink-0 shadow-sm">
                                 <img id="imgPreview" class="w-full h-full object-cover">
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <label class="flex items-center gap-2 text-xs font-bold text-slate-700 mb-2 cursor-pointer">
-                            <input type="checkbox" id="esRopa" onchange="alternarCamposRopa()" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
-                            ¿Este artículo es prenda de Ropa? (Habilitar Tallaje)
-                        </label>
-                        <div id="contenedor-talla" class="hidden">
-                            <label class="block text-xs font-semibold text-slate-600 mb-0.5">Número de Talla / Letra:</label>
-                            <input type="text" id="regTalla" placeholder="Ej. M, L, 32, 28" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        </div>
-                    </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-0.5">Precio (S/.):</label>
                             <input type="number" id="regPrecio" step="0.05" placeholder="0.00" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-0.5">Stock Inicial:</label>
-                            <input type="number" id="regStock" value="10" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <label class="block text-xs font-semibold text-slate-600 mb-0.5">Stock:</label>
+                            <input type="number" id="regStock" value="50" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </div>
                     </div>
-                    <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition" onclick="registrarProducto()">Guardar Artículo en Inventario</button>
+                    <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition" onclick="registrarProducto()">Guardar Artículo</button>
                 </div>
             </div>
 
             <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
                 <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                    <i data-lucide="boxes" class="w-4 h-4 text-indigo-500"></i> Inventario Editable en Tiempo Real
+                    <i data-lucide="boxes" class="w-4 h-4 text-indigo-500"></i> Inventario (Editable)
                 </h2>
                 <div class="overflow-x-auto rounded-xl border border-slate-100">
-                    <table class="w-full text-xs text-left min-w-[480px]">
+                    <table class="w-full text-xs text-left min-w-[420px]">
                         <thead class="bg-slate-50 text-slate-500 uppercase">
                             <tr>
                                 <th class="p-3 w-12">Foto</th>
                                 <th class="p-3">Producto</th>
-                                <th class="p-3">Talla</th>
                                 <th class="p-3">Precio</th>
                                 <th class="p-3">Stock</th>
                                 <th class="p-3 text-right">Acción</th>
@@ -194,10 +282,90 @@
             </div>
         </div>
 
+        <div id="vista-factura" class="hidden mt-4 flex flex-col items-center">
+            <div class="no-print flex gap-2 mb-3 w-full justify-center bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Imprimir Boleta
+                </button>
+                <button onclick="regresarAInicio()" class="bg-slate-600 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i> Volver al Terminal
+                </button>
+            </div>
+
+            <div class="contenedor-factura-scroll">
+                <div class="factura-a4-media text-slate-900 shadow-2xl" id="ticket-final">
+                    <div class="grid grid-cols-12 gap-2 border-b-2 border-slate-900 pb-1.5">
+                        <div class="col-span-7 flex gap-2 items-center">
+                            <div class="border-4 border-slate-900 font-black text-xl px-2 py-0.5 leading-none">SM</div>
+                            <div>
+                                <div class="text-sm font-black text-slate-900 tracking-tight" id="factura-nombre-bodega">SMART-MARKET</div>
+                                <div class="text-[8px] text-slate-600 leading-tight">
+                                    COMERCIALIZADORA GENERAL S.A.C · RUC: 20498765432<br>
+                                    Venta de Abarrotes, Bebidas y Consumo Masivo General<br>
+                                    Dirección Comercial Principal · Punto de Venta Autorizado
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-span-5 text-right flex flex-col justify-between">
+                            <div>
+                                <span class="text-[8px] font-bold text-slate-500 block uppercase tracking-wider">COMPROBANTE ELECTRÓNICO</span>
+                                <span class="text-[11px] font-black text-slate-900 block">BOLETA DE VENTA ELECTRÓNICA</span>
+                            </div>
+                            <div class="text-[9px] text-slate-700">
+                                <strong>Serie:</strong> <span class="font-bold">B001</span> · <strong>Número:</strong> <span id="lbl-ncf" class="font-bold">002451</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-2 py-1.5 text-[9px] border-b border-slate-200">
+                        <div class="col-span-8 space-y-0.5">
+                            <div><strong>CLIENTE:</strong> <span id="lbl-cliente" class="text-slate-900 font-semibold uppercase">-</span></div>
+                            <div><strong>DNI / RUC:</strong> <span id="lbl-dni-factura" class="text-slate-800 font-medium">-</span></div>
+                            <div><strong>DIRECCIÓN:</strong> <span id="lbl-dir-factura" class="text-slate-500 font-medium uppercase">-</span></div>
+                        </div>
+                        <div class="col-span-4 text-right space-y-0.5">
+                            <div><strong>FECHA EMISIÓN:</strong> <span id="lbl-fecha">-</span></div>
+                            <div><strong>MÉTODO PAGO:</strong> <span id="lbl-metodo-pago">-</span></div>
+                            <div class="text-slate-500"><strong>Moneda:</strong> S/. (Soles)</div>
+                        </div>
+                    </div>
+
+                    <div class="py-1.5" style="height: 48mm; overflow-y: auto;">
+                        <table class="w-full text-left text-[10px] border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-900 text-slate-500 uppercase text-[8px] tracking-wider font-bold">
+                                    <th class="pb-1 w-1/12 text-center">CANT.</th>
+                                    <th class="pb-1 w-7/12">DESCRIPCIÓN EN INVENTARIO</th>
+                                    <th class="pb-1 text-right w-2/12">P. UNIT</th>
+                                    <th class="pb-1 text-right w-2/12">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lbl-items-cuerpo" class="text-slate-800 divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-4 pt-1.5 border-t-2 border-slate-900 items-end">
+                        <div class="col-span-7 flex gap-3 items-center">
+                            <div id="qrcode-box" class="bg-white border border-slate-300 rounded shadow-sm"></div>
+                            <div class="space-y-1">
+                                <canvas id="barcode-canvas"></canvas>
+                                <div class="text-[7.5px] text-slate-400 leading-none">Representación impresa autorizada de la boleta electrónica.<br>Consulte el comprobante en la web de SUNAT.</div>
+                            </div>
+                        </div>
+                        <div class="col-span-5 bg-slate-50 p-2 rounded border border-slate-200 text-[10px] space-y-0.5">
+                            <div class="flex justify-between text-slate-600"><span>Op. Gravada:</span><span>S/. <span id="lbl-subtotal-final">0.00</span></span></div>
+                            <div class="flex justify-between text-slate-600"><span>I.G.V. (18%):</span><span>S/. <span id="lbl-itbis">0.00</span></span></div>
+                            <div class="flex justify-between font-black text-xs text-slate-900 pt-0.5 border-t border-slate-200"><span>TOTAL A PAGAR:</span><span>S/. <span id="lbl-total">0.00</span></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // --- CONFIGURACIÓN DE TU FIREBASE ---
+        // --- CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyDVtKfHL77_9wzFHLBWJXW7EqAFEQgaTNM",
             authDomain: "smart-market-c3269.firebaseapp.com",
@@ -212,12 +380,26 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') e.preventDefault();
+        });
+
+        const INVENTARIO_PREASIGNADO = [
+            { nombre: "Arroz Costeño Extra Superior 1kg", precio: "4.80", stock: 60, foto: "" },
+            { nombre: "Leche Evaporada Gloria Azul 400g", precio: "4.20", stock: 48, foto: "" },
+            { nombre: "Aceite Vegetal Primor Premium 1L", precio: "8.50", stock: 25, foto: "" }
+        ];
+
         let CARRITO_ACTUAL = [];
         let INVENTARIO_LOCAL = [];
         let VENTAS_LOCAL = [];
+        let CLIENTES_LOCAL = [];
         let HISTORIAL_CIERRES_LOCAL = [];
         let NOMBRE_BODEGA_LOCAL = "Smart-Market";
         let usuarioActualUid = null;
+        
+        // NUEVA VARIABLE GLOBAL PARA GUARDAR LA FOTO EN PROCESO
         let IMAGEN_BASE64_PROCESADA = "";
 
         auth.onAuthStateChanged((user) => {
@@ -232,6 +414,7 @@
             }
         });
 
+        // NUEVA FUNCIÓN NATIVA: PROCESA, COMPRIME Y REDIMENSIONA LA IMAGEN LOCAL
         function previsualizarYConvertirImagen(input) {
             const file = input.files[0];
             if (file) {
@@ -242,7 +425,7 @@
                     img.onload = function() {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        const maxDimension = 300;
+                        const maxDimension = 200; // Resolución optimizada para Firestore
                         let width = img.width;
                         let height = img.height;
 
@@ -255,7 +438,8 @@
                         canvas.height = height;
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        IMAGEN_BASE64_PROCESADA = canvas.toDataURL('image/jpeg', 0.7);
+                        // Conversión a formato compacto Base64 JPEG con calidad optimizada
+                        IMAGEN_BASE64_PROCESADA = canvas.toDataURL('image/jpeg', 0.65);
                         
                         document.getElementById("imgPreview").src = IMAGEN_BASE64_PROCESADA;
                         document.getElementById("previewContenedor").classList.remove("hidden");
@@ -265,38 +449,71 @@
             }
         }
 
-        function alternarCamposRopa() {
-            let chk = document.getElementById("esRopa").checked;
-            document.getElementById("contenedor-talla").style.display = chk ? "block" : "none";
-        }
-
         function inicializarEscuchasTiempoReal() {
             if(!usuarioActualUid) return;
 
             db.collection("configuracion").doc(usuarioActualUid).onSnapshot((doc) => {
-                if(doc.exists) NOMBRE_BODEGA_LOCAL = doc.data().nombre || "Smart-Market";
+                if(doc.exists) {
+                    NOMBRE_BODEGA_LOCAL = doc.data().nombre || "Smart-Market";
+                } else {
+                    db.collection("configuracion").doc(usuarioActualUid).set({ nombre: "Smart-Market" });
+                }
                 actualizarInterfaz();
             });
 
             db.collection("inventario").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
                 INVENTARIO_LOCAL = [];
-                snapshot.forEach(doc => { INVENTARIO_LOCAL.push({ idDoc: doc.id, ...doc.data() }); });
+                snapshot.forEach(doc => {
+                    INVENTARIO_LOCAL.push({ idDoc: doc.id, ...doc.data() });
+                });
+
+                if(INVENTARIO_LOCAL.length === 0) {
+                    INVENTARIO_PREASIGNADO.forEach(p => {
+                        db.collection("inventario").add({ ...p, userId: usuarioActualUid });
+                    });
+                }
+                
                 mostrarProductosVenta(document.getElementById("buscadorInicio").value);
-                if(!document.getElementById('vista-ajustes').classList.contains('hidden')) mostrarInventarioAjustes();
+                if(!document.getElementById('vista-ajustes').classList.contains('hidden')) {
+                    mostrarInventarioAjustes();
+                }
             });
 
-            db.collection("ventas_diarias").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
+            db.collection("ventas_diarias")
+              .where("userId", "==", usuarioActualUid)
+              .onSnapshot((snapshot) => {
                 VENTAS_LOCAL = [];
-                snapshot.forEach(doc => { VENTAS_LOCAL.push({ idDoc: doc.id, ...doc.data() }); });
+                snapshot.forEach(doc => {
+                    VENTAS_LOCAL.push({ idDoc: doc.id, ...doc.data() });
+                });
                 VENTAS_LOCAL.sort((a,b) => b.idVenta - a.idVenta);
                 mostrarHistorialVentas();
                 calcularGanancias();
             });
 
+            db.collection("clientes").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
+                CLIENTES_LOCAL = [];
+                snapshot.forEach(doc => {
+                    CLIENTES_LOCAL.push(doc.data());
+                });
+            });
+
             db.collection("historial_cierres").where("userId", "==", usuarioActualUid).onSnapshot((snapshot) => {
                 HISTORIAL_CIERRES_LOCAL = [];
-                snapshot.forEach(doc => { HISTORIAL_CIERRES_LOCAL.push(doc.data()); });
-                if(!document.getElementById('vista-ajustes').classList.contains('hidden')) calcularReportesEstadisticos();
+                snapshot.forEach(doc => {
+                    HISTORIAL_CIERRES_LOCAL.push(doc.data());
+                });
+                HISTORIAL_CIERRES_LOCAL.sort((a,b) => b.idCierre - a.idCierre);
+                if(!document.getElementById('vista-ajustes').classList.contains('hidden')) {
+                    mostrarHistorialCierres();
+                    calcularReportesEstadisticos();
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (e.target.id !== 'input-cliente-inicio') {
+                    document.getElementById('sugerencias-clientes').classList.add('hidden');
+                }
             });
         }
 
@@ -305,12 +522,25 @@
             renderizarCarrito();
         }
 
-        function cerrarModalCarrito() { document.getElementById('modal-carrito').classList.add('hidden'); }
+        function cerrarModalCarrito() {
+            document.getElementById('modal-carrito').classList.add('hidden');
+        }
+
+        async function cambiarNombreBodega() {
+            if(!usuarioActualUid) return;
+            const { value: nuevo } = await Swal.fire({
+                title: 'Nombre de tu Bodega', input: 'text', inputValue: NOMBRE_BODEGA_LOCAL, showCancelButton: true, confirmButtonColor: '#4f46e5'
+            });
+            if(nuevo && nuevo.trim() !== "") {
+                await db.collection("configuracion").doc(usuarioActualUid).set({ nombre: nuevo.trim() });
+            }
+        }
 
         function alternarVistaAjustes() {
             let panel = document.getElementById('vista-ajustes');
             let btnTxt = document.getElementById('txt-boton-menu');
             let btnIcono = document.getElementById('icono-menu-contenedor');
+            document.getElementById('vista-factura').classList.add('hidden');
             cerrarModalCarrito();
             
             if(panel.classList.contains('hidden')) {
@@ -319,6 +549,7 @@
                 btnTxt.innerText = "Ver Terminal Venta";
                 btnIcono.innerHTML = `<i data-lucide="layout-dashboard" class="w-4 h-4"></i>`;
                 mostrarInventarioAjustes();
+                mostrarHistorialCierres();
                 calcularReportesEstadisticos();
             } else {
                 panel.classList.add('hidden');
@@ -330,9 +561,18 @@
             try { lucide.createIcons(); } catch(e){}
         }
 
+        function regresarAInicio() {
+            document.getElementById('vista-factura').classList.add('hidden');
+            document.getElementById('vista-inicio').classList.remove('hidden');
+            document.getElementById('txt-boton-menu').innerText = "Panel de Gestión";
+            document.getElementById('icono-menu-contenedor').innerHTML = `<i data-lucide="sliders-horizontal" class="w-4 h-4"></i>`;
+            actualizarInterfaz();
+        }
+
         function actualizarInterfaz() {
             try {
                 document.getElementById("nombreBodegaTitulo").innerHTML = `<i data-lucide="store" class="w-4 h-4"></i> <span class="uppercase font-bold tracking-tight">${NOMBRE_BODEGA_LOCAL}</span>`;
+                document.getElementById("factura-nombre-bodega").innerText = NOMBRE_BODEGA_LOCAL.toUpperCase();
                 mostrarProductosVenta(document.getElementById("buscadorInicio").value);
                 mostrarHistorialVentas();
                 renderizarCarrito();
@@ -341,19 +581,48 @@
             } catch (e) { console.error(e); }
         }
 
+        function buscarClienteAutocompletar(texto) {
+            let panel = document.getElementById("sugerencias-clientes");
+            if(!panel) return;
+            panel.innerHTML = "";
+            let filtrados = CLIENTES_LOCAL.filter(c => c.nombre && c.nombre.toLowerCase().includes(texto.toLowerCase()));
+
+            if(filtrados.length === 0 || texto.trim() === "") {
+                panel.classList.add('hidden'); return;
+            }
+
+            panel.classList.remove('hidden');
+            filtrados.forEach(c => {
+                let div = document.createElement("div");
+                div.className = "p-2 hover:bg-slate-100 cursor-pointer text-slate-700 font-medium uppercase transition";
+                div.innerHTML = `<div>${c.nombre}</div><div class="text-[9px] text-slate-400 font-normal">DNI: ${c.dni || '---'} · ${c.direccion || '---'}</div>`;
+                div.onclick = function() {
+                    document.getElementById("input-cliente-inicio").value = c.nombre;
+                    document.getElementById("input-dni-cliente").value = c.dni || "";
+                    document.getElementById("input-dir-cliente").value = c.direccion || "";
+                    panel.classList.add('hidden');
+                };
+                panel.appendChild(div);
+            });
+        }
+
+        function limpiarCamposCliente() {
+            document.getElementById("input-cliente-inicio").value = "";
+            document.getElementById("input-dni-cliente").value = "";
+            document.getElementById("input-dir-cliente").value = "";
+            document.getElementById("input-cliente-inicio").focus();
+        }
+
         function calcularGanancias() {
             let total = VENTAS_LOCAL.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
             document.getElementById("totalGanancias").innerText = `S/. ${total.toFixed(2)}`;
         }
 
+        // MODIFICADO: MUESTRA LA FOTO EN EL CATÁLOGO SI EXISTE
         function mostrarProductosVenta(filtro = "") {
             let lista = document.getElementById("listaProductosInicio"); if(!lista) return;
-            text = filtro.toLowerCase();
             lista.innerHTML = "";
-            let filtrados = INVENTARIO_LOCAL.filter(p => 
-                (p.nombre && p.nombre.toLowerCase().includes(text)) ||
-                (p.talla && p.talla.toLowerCase().includes(text))
-            );
+            let filtrados = INVENTARIO_LOCAL.filter(p => p.nombre && p.nombre.toLowerCase().includes(filtro.toLowerCase()));
 
             if(filtrados.length === 0) {
                 lista.innerHTML = "<div class='p-3 text-center text-slate-400 text-xs'>Sin productos en catálogo</div>"; return;
@@ -362,19 +631,18 @@
             filtrados.forEach(p => {
                 let div = document.createElement("div");
                 div.className = "flex justify-between items-center p-2.5 hover:bg-slate-50 cursor-pointer transition rounded-xl active:bg-slate-100";
-                let imgHtml = p.foto ? `<img src="${p.foto}" class="w-8 h-8 rounded-lg object-cover bg-slate-100">` : `<div class="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center"><i data-lucide="image" class="w-4 h-4 text-slate-400"></i></div>`;
-                let tallaHtml = p.talla ? `<span class="bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-bold ml-1">Talla: ${p.talla}</span>` : '';
                 
+                let imgHtml = p.foto ? `<img src="${p.foto}" class="w-8 h-8 rounded-lg object-cover bg-slate-100 shrink-0 shadow-sm border border-slate-100">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-100"><i data-lucide="image" class="w-3.5 h-3.5 text-slate-300"></i></div>`;
+
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
                         ${imgHtml}
                         <div>
-                            <p class="font-bold text-slate-800 text-xs">${p.nombre} ${tallaHtml}</p>
+                            <p class="font-bold text-slate-800 text-xs">${p.nombre}</p>
                             <span class="text-[10px] text-slate-400 font-semibold">Disponible: ${p.stock} un.</span>
                         </div>
                     </div>
-                    <span class="text-indigo-600 font-black text-xs bg-indigo-50 px-2 py-1 rounded-lg">S/. ${p.precio}</span>
-                `;
+                    <span class="text-indigo-600 font-black text-xs bg-indigo-50 px-2 py-1 rounded-lg">S/. ${p.precio}</span>`;
                 div.onclick = function() { agregarAlCarrito(p); };
                 lista.appendChild(div);
             });
@@ -388,7 +656,7 @@
             if (index !== -1) {
                 CARRITO_ACTUAL[index].cantidad += 1;
             } else {
-                CARRITO_ACTUAL.push({ idDoc: producto.idDoc, nombre: producto.nombre, precio: producto.precio, talla: producto.talla || '', cantidad: 1 });
+                CARRITO_ACTUAL.push({ idDoc: producto.idDoc, nombre: producto.nombre, precio: producto.precio, cantidad: 1 });
             }
             renderizarCarrito();
         }
@@ -411,13 +679,12 @@
                 let itemSubtotal = parseFloat(item.precio) * item.cantidad;
                 total += itemSubtotal;
                 itemsTotales += item.cantidad;
-                let tTxt = item.talla ? ` [Talla ${item.talla}]` : '';
 
                 let div = document.createElement("div");
                 div.className = "flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs";
                 div.innerHTML = `
                     <div class="max-w-[50%] truncate">
-                        <p class="font-bold text-slate-800 truncate">${item.nombre}${tTxt}</p>
+                        <p class="font-bold text-slate-800 truncate">${item.nombre}</p>
                         <span class="text-slate-400 font-medium text-[10px]">S/. ${item.precio} c/u</span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -439,17 +706,17 @@
             document.getElementById("badge-carrito").innerText = itemsTotales;
         }
 
-        function preguntarMetodoPago() {
+        function preguntarMetodoPagoYBoleta() {
             CARRITO_ACTUAL = CARRITO_ACTUAL.filter(item => item && item.cantidad > 0);
             if(CARRITO_ACTUAL.length === 0) {
-                Swal.fire({ icon: 'warning', title: 'Cesta Vacía', text: 'Agregue algún producto antes de continuar.', confirmButtonColor: '#4f46e5' }); return;
+                Swal.fire({ icon: 'warning', title: 'Cesta Vacía', text: 'Agregue algún producto antes de facturar.', confirmButtonColor: '#4f46e5' }); return;
             }
 
             Swal.fire({
-                title: 'Método de Pago', text: '¿Cómo se recibió este cobro?', icon: 'question',
+                title: 'Método de Pago', text: '¿Cómo desea pagar la orden?', icon: 'question',
                 showDenyButton: true, showCancelButton: true,
-                confirmButtonText: '💵 Efectivo', denyButtonText: '📱 Yape', cancelButtonText: 'Cancelar',
-                confirmButtonColor: '#10b981', denyButtonColor: '#a855f7', cancelButtonColor: '#6b7280'
+                confirmButtonText: '💵 Efectivo', denyButtonText: '📱 Yape / Plin', cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#10b981', denyButtonColor: '#0ea5e9', cancelButtonColor: '#6b7280'
             }).then((result) => {
                 if (result.isConfirmed) {
                     cerrarModalCarrito(); procesarVentaCarrito('Efectivo 💵');
@@ -477,25 +744,102 @@
             });
             await batch.commit();
 
+            let nombreCliente = document.getElementById("input-cliente-inicio").value.trim() || "PÚBLICO GENERAL";
+            let dniCliente = document.getElementById("input-dni-cliente").value.trim() || "-------";
+            let dirCliente = document.getElementById("input-dir-cliente").value.trim() || "-------";
+            
+            if (nombreCliente !== "PÚBLICO GENERAL" && nombreCliente !== "") {
+                await db.collection("clientes").doc(usuarioActualUid + "_" + nombreCliente.toLowerCase()).set({
+                    nombre: nombreCliente, dni: dniCliente, direccion: dirCliente, userId: usuarioActualUid
+                });
+            }
+
             let ahora = new Date();
             let totalVenta = CARRITO_ACTUAL.reduce((sum, i) => sum + (parseFloat(i.precio) * i.cantidad), 0);
 
             let nuevaVenta = {
                 userId: usuarioActualUid,
                 idVenta: Date.now(),
+                cliente: nombreCliente,
+                dni: dniCliente,
+                direccion: dirCliente,
                 items: [...CARRITO_ACTUAL],
                 total: totalVenta.toFixed(2),
                 metodo: metodoPago,
                 fecha: ahora.toLocaleDateString(),
+                hora: ahora.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 mesAnio: ahora.toLocaleString('es-ES', { month: 'long', year: 'numeric' })
             };
 
             await db.collection("ventas_diarias").add(nuevaVenta);
+
+            let ventaParaImprimir = JSON.parse(JSON.stringify(nuevaVenta));
             CARRITO_ACTUAL = [];
             document.getElementById("buscadorInicio").value = "";
+            document.getElementById("input-cliente-inicio").value = "PÚBLICO GENERAL";
+            document.getElementById("input-dni-cliente").value = "";
+            document.getElementById("input-dir-cliente").value = "";
+            
             actualizarInterfaz();
 
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '¡Inventario Actualizado!', showConfirmButton: false, timer: 1500 });
+            setTimeout(() => {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '¡Cobro Exitoso!', showConfirmButton: false, timer: 1200 });
+                dispararComprobanteA4(ventaParaImprimir);
+            }, 350);
+        }
+
+        function dispararComprobanteA4(venta) {
+            let total = parseFloat(venta.total);
+            let subtotalNeto = total / 1.18;
+            let igv = total - subtotalNeto;
+
+            document.getElementById('lbl-cliente').innerText = venta.cliente.toUpperCase();
+            document.getElementById('lbl-dni-factura').innerText = venta.dni || "-------";
+            document.getElementById('lbl-dir-factura').innerText = venta.direccion || "-------";
+            
+            document.getElementById('lbl-metodo-pago').innerText = venta.metodo;
+            document.getElementById('lbl-fecha').innerText = `${venta.fecha} ${venta.hora}`;
+            document.getElementById('lbl-ncf').innerText = Math.floor(100000 + Math.random() * 900000);
+
+            let tablaBody = document.getElementById("lbl-items-cuerpo"); tablaBody.innerHTML = "";
+            venta.items.forEach(item => {
+                let row = tablaBody.insertRow();
+                let sub = parseFloat(item.precio) * item.cantidad;
+                row.innerHTML = `
+                    <td class="py-1 text-center font-bold">${item.cantidad}</td>
+                    <td class="py-1 uppercase font-semibold text-slate-900">${item.nombre}</td>
+                    <td class="py-1 text-right">S/. ${parseFloat(item.precio).toFixed(2)}</td>
+                    <td class="py-1 text-right font-bold text-slate-950">S/. ${sub.toFixed(2)}</td>
+                `;
+            });
+
+            document.getElementById('lbl-subtotal-final').innerText = subtotalNeto.toFixed(2);
+            document.getElementById('lbl-itbis').innerText = igv.toFixed(2);
+            document.getElementById('lbl-total').innerText = total.toFixed(2);
+
+            document.getElementById('vista-inicio').classList.add('hidden');
+            document.getElementById('vista-ajustes').classList.add('hidden');
+            document.getElementById('vista-factura').classList.remove('hidden');
+
+            setTimeout(() => {
+                try { 
+                    JsBarcode("#barcode-canvas", "750101234567", { format: "EAN13", width: 1.1, height: 22, displayValue: true, fontSize: 8 }); 
+                } catch(e) { console.error("Error barras:", e); }
+                
+                try {
+                    let qrBox = document.getElementById('qrcode-box'); 
+                    let nuevoQrBox = qrBox.cloneNode(false);
+                    qrBox.parentNode.replaceChild(nuevoQrBox, qrBox);
+                    
+                    let textoQR = `Boleta|Total:S/.${venta.total}|Cliente:${venta.cliente}`;
+                    nuevoQrBox.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=54x54&data=${encodeURIComponent(textoQR)}" width="54" height="54" style="display:block; background-color:#ffffff;" />`;
+                } catch(e) { 
+                    console.error("Error QR:", e); 
+                }
+            }, 80);
+
+            try { lucide.createIcons(); } catch(e) {}
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function mostrarHistorialVentas() {
@@ -505,177 +849,206 @@
             
             VENTAS_LOCAL.forEach(v => {
                 let fila = tbody.insertRow();
-                let descripcionCorta = v.items ? v.items.map(i => `${i.cantidad}x ${i.nombre}${i.talla ? ' (T:'+i.talla+')' : ''}`).join(', ') : '---';
+                let descripcionCorta = v.items ? v.items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') : '---';
                 fila.innerHTML = `
-                    <td class="p-2.5 text-slate-700 truncate max-w-[200px] font-medium">${descripcionCorta}</td>
-                    <td class="p-2.5 text-slate-600 font-semibold">${v.metodo}</td>
-                    <td class="p-2.5 font-black text-slate-900 text-right">S/. ${v.total}</td>
+                    <td class="p-2.5 font-bold uppercase text-slate-700 truncate max-w-[100px]">${v.cliente}</td>
+                    <td class="p-2.5 text-slate-500 truncate max-w-[150px]">${descripcionCorta}</td>
+                    <td class="p-2.5 font-black text-slate-900">S/. ${v.total}</td>
+                    <td class="p-2.5 text-right"><button class="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-xl font-bold text-[10px]" onclick="reimprimirVentaDirecta(${v.idVenta})">Ver</button></td>
                 `;
             });
         }
 
+        function reimprimirVentaDirecta(idBusqueda) { 
+            let obj = VENTAS_LOCAL.find(v => v.idVenta === idBusqueda);
+            if(obj) dispararComprobanteA4(obj);
+        }
+
+        // MODIFICADO: AHORA GUARDA LA FOTO LOCAL BASE64 ASOCIADA AL ARTÍCULO
         async function registrarProducto() {
             if(!usuarioActualUid) return;
             let nombre = document.getElementById("regNombre").value.trim();
-            let esPrenda = document.getElementById("esRopa").checked;
-            let talla = esPrenda ? document.getElementById("regTalla").value.trim() : "";
             let precio = parseFloat(document.getElementById("regPrecio").value);
             let stock = parseInt(document.getElementById("regStock").value);
 
             if (!nombre || isNaN(precio) || isNaN(stock) || stock < 0) {
-                Swal.fire({ icon: 'error', title: 'Campos Inválidos', text: 'Por favor complete el nombre, precio y stock básico.', confirmButtonColor: '#4f46e5' }); return;
+                Swal.fire({ icon: 'error', title: 'Campos Inválidos', text: 'Por favor complete todos los campos con valores correctos.', confirmButtonColor: '#4f46e5' }); return;
             }
 
             try {
                 await db.collection("inventario").add({
                     userId: usuarioActualUid,
-                    nombre: nombre,
-                    foto: IMAGEN_BASE64_PROCESADA, 
-                    talla: talla,
+                    nombre: nombre, 
                     precio: precio.toFixed(2), 
-                    stock: stock
+                    stock: stock,
+                    foto: IMAGEN_BASE64_PROCESADA // Guarda la cadena compactada
                 });
 
                 document.getElementById("regNombre").value = ""; 
-                document.getElementById("regFotoLocal").value = ""; 
-                document.getElementById("regTalla").value = ""; 
                 document.getElementById("regPrecio").value = "";
-                document.getElementById("regStock").value = "10";
-                document.getElementById("esRopa").checked = false;
+                document.getElementById("regStock").value = "50";
+                document.getElementById("regFotoLocal").value = "";
                 document.getElementById("previewContenedor").classList.add("hidden");
-                IMAGEN_BASE64_PROCESADA = "";
-                alternarCamposRopa();
+                IMAGEN_BASE64_PROCESADA = ""; // Reset de la foto procesada
                 
-                Swal.fire({ icon: 'success', title: 'Guardado', text: 'Artículo añadido al inventario.', timer: 1500, showConfirmButton: false });
-            } catch (error) { console.error(error); }
-        }
-
-        // NUEVA FUNCIÓN: Formatea todas las colecciones asociadas a este administrador
-        async function formatearSistemaPorCompleto() {
-            if(!usuarioActualUid) return;
-
-            let conf1 = await Swal.fire({
-                title: '¿Formatear el Sistema?',
-                text: "Esta acción borrará de manera irreversible todos los productos, ventas diarias e historiales acumulados. ¿Estás absolutamente seguro?",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#dc2626',
-                cancelButtonColor: '#64748b',
-                confirmButtonText: 'Sí, deseo borrar todo',
-                cancelButtonText: 'Cancelar'
-            });
-
-            if (conf1.isConfirmed) {
-                let conf2 = await Swal.fire({
-                    title: 'Confirmación Final de Seguridad',
-                    text: "Escribe la palabra BORRAR en mayúsculas para proceder con la limpieza total:",
-                    input: 'text',
-                    inputPlaceholder: 'BORRAR',
-                    icon: 'error',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#64748b',
-                    confirmButtonText: 'Ejecutar formateo total',
-                    cancelButtonText: 'Cancelar'
-                });
-
-                if(conf2.value === "BORRAR") {
-                    Swal.fire({ title: 'Limpiando Base de Datos...', text: 'Por favor espere', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-                    
-                    try {
-                        let batch = db.batch();
-                        
-                        // 1. Consultar y borrar inventario
-                        let snapInv = await db.collection("inventario").where("userId", "==", usuarioActualUid).get();
-                        snapInv.forEach(doc => batch.delete(db.collection("inventario").doc(doc.id)));
-
-                        // 2. Consultar y borrar ventas diarias
-                        let snapVentas = await db.collection("ventas_diarias").where("userId", "==", usuarioActualUid).get();
-                        snapVentas.forEach(doc => batch.delete(db.collection("ventas_diarias").doc(doc.id)));
-
-                        // 3. Consultar y borrar cierres históricos
-                        let snapCierres = await db.collection("historial_cierres").where("userId", "==", usuarioActualUid).get();
-                        snapCierres.forEach(doc => batch.delete(db.collection("historial_cierres").doc(doc.id)));
-
-                        await batch.commit();
-                        
-                        CARRITO_ACTUAL = [];
-                        alternarVistaAjustes(); // Volver a la pantalla de ventas
-                        
-                        Swal.fire({ icon: 'success', title: '¡Sistema Formateado!', text: 'La base de datos se encuentra limpia y lista.', confirmButtonColor: '#10b981' });
-                    } catch (error) {
-                        console.error(error);
-                        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo completar el formateo.', confirmButtonColor: '#dc2626' });
-                    }
-                } else if(conf2.isConfirmed) {
-                    Swal.fire({ icon: 'error', title: 'Palabra Incorrecta', text: 'No escribiste la palabra exacta de seguridad. Operación cancelada.', confirmButtonColor: '#4f46e5' });
-                }
+                Swal.fire({ icon: 'success', title: 'Guardado', text: 'Artículo añadido a tu inventario privado.', timer: 1500, showConfirmButton: false });
+            } catch (error) {
+                console.error("Error al guardar producto:", error);
             }
         }
 
         async function cerrarDiaDeVentas() {
             if(!usuarioActualUid) return;
             if(VENTAS_LOCAL.length === 0) { 
-                Swal.fire({ icon: 'info', title: 'Sin Movimientos', text: 'No hay operaciones para registrar el día de hoy.', confirmButtonColor: '#4f46e5' }); return; 
+                Swal.fire({ icon: 'info', title: 'Sin Ventas', text: 'No hay operaciones para guardar hoy.', confirmButtonColor: '#4f46e5' }); return; 
             }
 
             let resultSwal = await Swal.fire({
-                title: '¿Cerrar Día Comercial?', text: "El dinero recaudado se guardará en el historial mensual y el terminal diario quedará en cero.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, cerrar'
+                title: '¿Cerrar Día Comercial?', text: "El acumulado y el desglose detallado de ventas se enviarán al historial mensual. Se limpiará el terminal.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, cerrar'
             });
 
             if(resultSwal.isConfirmed) {
                 let totalHoy = VENTAS_LOCAL.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
                 let ahora = new Date();
+                
+                let ventasDetalladas = VENTAS_LOCAL.map(v => ({
+                    hora: v.hora,
+                    cliente: v.cliente,
+                    metodo: v.metodo,
+                    total: v.total,
+                    items: v.items ? v.items.map(i => `${i.cantidad}x ${i.nombre}`) : []
+                }));
 
                 let cierreCaja = {
                     userId: usuarioActualUid,
                     idCierre: Date.now(), 
-                    fechaIdentificador: ahora.toLocaleDateString(),
+                    fechaIdentificador: grandmaLocaleDate(ahora),
                     mesAnio: ahora.toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
-                    total: totalHoy.toFixed(2)
+                    total: totalHoy.toFixed(2),
+                    ventasDelDia: ventasDetalladas
                 };
 
-                await db.collection("historial_cierres").add(cierreCaja);
-                
-                let batch = db.batch();
-                VENTAS_LOCAL.forEach(v => { batch.delete(db.collection("ventas_diarias").doc(v.idDoc)); });
-                await batch.commit();
-                
-                Swal.fire({ icon: 'success', title: 'Cierre completado', timer: 1500, showConfirmButton: false });
+                function grandmaLocaleDate(d) { return d.toLocaleDateString(); }
+
+                try {
+                    await db.collection("historial_cierres").add(cierreCaja);
+                    
+                    let batch = db.batch();
+                    VENTAS_LOCAL.forEach(v => {
+                        let docRef = db.collection("ventas_diarias").doc(v.idDoc);
+                        batch.delete(docRef);
+                    });
+                    await batch.commit();
+                    
+                    Swal.fire({ icon: 'success', title: 'Día Cerrado con Éxito', timer: 1800, showConfirmButton: false });
+                } catch (error) {
+                    console.error("Error al cerrar el día:", error);
+                }
             }
         }
 
         function calcularReportesEstadisticos() {
             let divMeses = document.getElementById("reporteMesesCuerpo"); if(!divMeses) return;
             divMeses.innerHTML = "";
-            if(HISTORIAL_CIERRES_LOCAL.length === 0) { divMeses.innerHTML = "<p class='text-slate-400 text-xs text-center py-4 w-full col-span-2'>Sin cierres registrados.</p>"; return; }
+            if(HISTORIAL_CIERRES_LOCAL.length === 0) { divMeses.innerHTML = "<p class='text-slate-400 text-xs'>Sin cierres registrados.</p>"; return; }
             
             let meses = {};
             HISTORIAL_CIERRES_LOCAL.forEach(c => { meses[c.mesAnio] = (meses[c.mesAnio] || 0) + (parseFloat(c.total) || 0); });
             Object.keys(meses).forEach(m => { divMeses.innerHTML += `<div class="bg-white p-3 border border-purple-100 rounded-xl"><h4 class="text-xs font-semibold text-slate-500">📅 ${m}</h4><p class="text-base font-black text-purple-700">S/. ${meses[m].toFixed(2)}</p></div>`; });
         }
 
+        function mostrarHistorialCierres() {
+            let tbody = document.getElementById("tablaHistorialCierres"); if(!tbody) return;
+            tbody.innerHTML = "";
+            
+            HISTORIAL_CIERRES_LOCAL.forEach(c => {
+                let fila = `<tr>
+                    <td class="p-3 font-medium text-slate-700">${c.fechaIdentificador}</td>
+                    <td class="p-3 text-emerald-600 font-bold">S/. ${c.total}</td>
+                    <td class="p-3 text-right">
+                        <button class="bg-purple-50 text-purple-600 hover:bg-purple-100 px-2.5 py-1 rounded-xl font-bold text-[10px] transition shadow-sm" 
+                                onclick="verDetalleCierre(${c.idCierre})">
+                            Ver Ventas
+                        </button>
+                    </td>
+                </tr>`;
+                tbody.innerHTML += fila;
+            });
+        }
+
+        function verDetalleCierre(idCierre) {
+            let cierre = HISTORIAL_CIERRES_LOCAL.find(c => c.idCierre === idCierre);
+            if (!cierre) return;
+
+            if (!cierre.ventasDelDia || cierre.ventasDelDia.length === 0) {
+                Swal.fire({ icon: 'info', title: 'Detalle no disponible', text: 'Este cierre antiguo no cuenta con el desglose de ventas guardado.' });
+                return;
+            }
+
+            let tablaHtml = `
+                <div class="text-left overflow-x-auto max-h-[60vh] text-xs">
+                    <p class="mb-3 text-slate-500 font-medium">Resumen de operaciones del día <strong>${cierre.fechaIdentificador}</strong>.</p>
+                    <table class="w-full border-collapse rounded-xl overflow-hidden shadow-sm text-left">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 uppercase text-[10px] font-bold">
+                                <th class="p-2 border-b">Hora</th>
+                                <th class="p-2 border-b">Cliente</th>
+                                <th class="p-2 border-b">Método</th>
+                                <th class="p-2 border-b">Artículos vendidos</th>
+                                <th class="p-2 border-b text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+            `;
+
+            cierre.ventasDelDia.forEach(v => {
+                let listaItems = v.items ? v.items.join("<br> ") : '';
+                tablaHtml += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2 align-top text-slate-500 font-mono">${v.hora || '---'}</td>
+                        <td class="p-2 align-top font-bold uppercase text-slate-700">${v.cliente}</td>
+                        <td class="p-2 align-top text-slate-600">${v.metodo || '---'}</td>
+                        <td class="p-2 align-top text-slate-500 italic leading-tight">${listaItems}</td>
+                        <td class="p-2 align-top text-right font-black text-slate-900">S/. ${v.total}</td>
+                    </tr>
+                `;
+            });
+
+            tablaHtml += `
+                        </tbody>
+                    </table>
+                    <div class="mt-4 text-right text-sm">
+                        <span class="font-bold text-slate-500">Recaudación Total:</span>
+                        <span class="font-black text-emerald-600 text-lg ml-1">S/. ${cierre.total}</span>
+                    </div>
+                </div>
+            `;
+
+            Swal.fire({
+                title: `Detalle de Cierre: ${cierre.fechaIdentificador}`,
+                html: tablaHtml,
+                width: '650px',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#4f46e5'
+            });
+        }
+
+        // MODIFICADO: RENDERIZA LA COLUMNA DE LA FOTO EN EL PANEL DE GESTIÓN
         function mostrarInventarioAjustes() {
             let tbody = document.getElementById("tablaAjustesInventario"); if(!tbody) return;
             tbody.innerHTML = "";
 
-            if(INVENTARIO_LOCAL.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs font-medium">El inventario está completamente vacío.</td></tr>`; return;
-            }
-
             INVENTARIO_LOCAL.forEach((p, index) => {
                 let fila = tbody.insertRow(); fila.className = "hover:bg-slate-50 transition";
                 
-                let imgHtml = p.foto ? `<img src="${p.foto}" class="w-7 h-7 rounded object-cover bg-slate-100">` : `<div class="w-7 h-7 rounded bg-slate-100 flex items-center justify-center"><i data-lucide="image" class="w-3.5 h-3.5 text-slate-300"></i></div>`;
+                let imgHtml = p.foto ? `<img src="${p.foto}" class="w-7 h-7 rounded object-cover bg-slate-100 border shadow-sm">` : `<div class="w-7 h-7 rounded bg-slate-100 flex items-center justify-center border text-slate-300"><i data-lucide="image" class="w-3.5 h-3.5"></i></div>`;
                 
                 fila.insertCell(0).innerHTML = `<div class="p-1">${imgHtml}</div>`;
                 
-                let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium truncate max-w-[140px]"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
-                let celdaTalla = fila.insertCell(2); celdaTalla.className = "p-3 focus:bg-amber-50 rounded font-bold text-amber-700"; celdaTalla.contentEditable = "true"; celdaTalla.innerText = p.talla || '-'; celdaTalla.onblur = function() { guardarEdicionDirecta(index, 'talla', celdaTalla.innerText); };
-                let celdaPrecio = fila.insertCell(3); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
-                let celdaStock = fila.insertCell(4); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
-                
-                let celdaAccion = fila.insertCell(5); celdaAccion.className = "p-3 text-right"; celdaAccion.innerHTML = `<button class="text-red-500 font-semibold hover:underline" onclick="eliminarProducto(${index})">Eliminar</button>`;
+                let celdaNombre = fila.insertCell(1); celdaNombre.className = "p-3 focus:bg-amber-50 rounded font-medium max-w-[150px] truncate"; celdaNombre.contentEditable = "true"; celdaNombre.innerText = p.nombre || ''; celdaNombre.onblur = function() { guardarEdicionDirecta(index, 'nombre', celdaNombre.innerText); };
+                let celdaPrecio = fila.insertCell(2); celdaPrecio.className = "p-3 focus:bg-amber-50 rounded font-semibold text-slate-900"; celdaPrecio.contentEditable = "true"; celdaPrecio.innerText = p.precio || '0.00'; celdaPrecio.onblur = function() { guardarEdicionDirecta(index, 'precio', celdaPrecio.innerText); };
+                let celdaStock = fila.insertCell(3); celdaStock.className = "p-3 focus:bg-amber-50 rounded font-bold text-indigo-600"; celdaStock.contentEditable = "true"; celdaStock.innerText = p.stock !== undefined ? p.stock : 0; celdaStock.onblur = function() { guardarEdicionDirecta(index, 'stock', celdaStock.innerText); };
+                let celdaAccion = fila.insertCell(4); celdaAccion.className = "p-3 text-right"; celdaAccion.innerHTML = `<button class="text-red-500 font-semibold hover:underline" onclick="eliminarProducto(${index})">Eliminar</button>`;
             });
             try { lucide.createIcons(); } catch(e){}
         }
@@ -685,7 +1058,6 @@
             let datosActualizados = {};
             
             if(campo === 'nombre') datosActualizados.nombre = nuevoValor.trim();
-            if(campo === 'talla') datosActualizados.talla = nuevoValor.trim() === '-' ? "" : nuevoValor.trim();
             if(campo === 'precio') { let p = parseFloat(nuevoValor); datosActualizados.precio = isNaN(p) ? "0.00" : p.toFixed(2); }
             if(campo === 'stock') { let s = parseInt(nuevoValor); datosActualizados.stock = isNaN(s) || s < 0 ? 0 : s; }
             
@@ -694,18 +1066,68 @@
 
         async function eliminarProducto(index) {
             let prod = INVENTARIO_LOCAL[index];
-            let resultSwal = await Swal.fire({ title: '¿Eliminar artículo?', text: `Se quitará de tu inventario.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Eliminar' });
-            if(resultSwal.isConfirmed) { await db.collection("inventario").doc(prod.idDoc).delete(); }
+            let resultSwal = await Swal.fire({ title: '¿Eliminar artículo?', text: `Se quitará permanentemente de tu inventario.`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Eliminar' });
+            if(resultSwal.isConfirmed) {
+                await db.collection("inventario").doc(prod.idDoc).delete();
+            }
         }
 
-        async function cambiarNombreBodega() {
+        // OPTIMIZADO: FORMATEA EL SISTEMA BORRANDO TAMBIÉN TODO EL HISTORIAL DE CIERRES ANTERIORES
+        async function formatearTodoElSistema() {
             if(!usuarioActualUid) return;
-            const { value: nuevo } = await Swal.fire({ title: 'Nombre de tu Marca/Tienda', input: 'text', inputValue: NOMBRE_BODEGA_LOCAL, showCancelButton: true, confirmButtonColor: '#4f46e5' });
-            if(nuevo && nuevo.trim() !== "") { await db.collection("configuracion").doc(usuarioActualUid).set({ nombre: nuevo.trim() }); }
+            let primerConfirmacion = await Swal.fire({
+                title: '¿Estás completamente seguro?',
+                text: "Esta acción borrará TODO tu inventario (incluyendo fotos subidas), ventas acumuladas e historiales de cierres mensuales de forma irreversible.",
+                icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Sí, borrar mi tienda'
+            });
+
+            if(primerConfirmacion.isConfirmed) {
+                let segundaConfirmacion = await Swal.fire({
+                    title: 'Verificación Final de Seguridad', text: 'Escribe "BORRAR TODO" en mayúsculas para proceder con el formateo completo de la nube:',
+                    input: 'text', inputPlaceholder: 'BORRAR TODO', icon: 'error', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280',
+                    preConfirm: (valor) => {
+                        if (valor !== 'BORRAR TODO') { Swal.showValidationMessage('El texto de seguridad no coincide.'); }
+                    }
+                });
+
+                if(segundaConfirmacion.isConfirmed) {
+                    Swal.fire({ title: 'Restableciendo base de datos...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+                    
+                    CARRITO_ACTUAL = [];
+                    let batch = db.batch();
+                    
+                    // 1. Limpieza de Inventario (Con fotos locales)
+                    INVENTARIO_LOCAL.forEach(p => batch.delete(db.collection("inventario").doc(p.idDoc)));
+                    
+                    // 2. Limpieza de Ventas Diarias
+                    VENTAS_LOCAL.forEach(v => batch.delete(db.collection("ventas_diarias").doc(v.idDoc)));
+                    
+                    // 3. Limpieza Completa de Cierres Históricos en la nube
+                    let snapCierres = await db.collection("historial_cierres").where("userId", "==", usuarioActualUid).get();
+                    snapCierres.forEach(doc => batch.delete(db.collection("historial_cierres").doc(doc.id)));
+                    
+                    batch.set(db.collection("configuracion").doc(usuarioActualUid), { nombre: "Smart-Market" });
+                    await batch.commit();
+
+                    document.getElementById('vista-ajustes').classList.add('hidden');
+                    document.getElementById('vista-factura').classList.add('hidden');
+                    document.getElementById('vista-inicio').classList.remove('hidden');
+
+                    await Swal.fire({ icon: 'success', title: 'Tu Tienda ha sido Restablecida por Completo', text: 'Todos los registros históricos se han limpiado.', confirmButtonColor: '#4f46e5' });
+                    actualizarInterfaz();
+                }
+            }
         }
 
         function cerrarSesion() {
-            auth.signOut().then(() => { window.location.href = "login.html"; });
+            Swal.fire({
+                title: '¿Cerrar sesión?', text: "Saldrás de tu cuenta comercial.", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#4f46e5', cancelButtonColor: '#64748b', confirmButtonText: 'Sí, salir'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    auth.signOut().then(() => { window.location.href = "login.html"; });
+                }
+            });
         }
     </script>
 </body>
